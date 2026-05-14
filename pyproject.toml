@@ -1,0 +1,32 @@
+[project]
+name = "arrival-agent"
+version = "0.1.0"
+description = "Agentic system at the Uber Travel Mode x Eats seam — predicts hotel arrival, curates open food, re-times delivery as the trip unfolds."
+requires-python = ">=3.11"
+dependencies = [
+    "langgraph>=0.2",
+    "langchain-core>=0.3",
+    "langchain-anthropic>=0.2",
+    "httpx>=0.27",
+    "pydantic>=2.7",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+arrival-agent = "arrival_agent.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
