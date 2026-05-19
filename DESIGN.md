@@ -22,6 +22,13 @@ open, and continuously **re-times** the delivery as real events arrive (flight
 landed, ride started, restaurant went offline). The interesting part is not the
 chat — it is the agent choosing to **wait** because acting early would fail.
 
+**The most agentic moment isn't picking the answer — it's designing the choice
+set.** When the agent finally surfaces, it presents 2–3 *meaningfully different*
+options (e.g. comfort food / fast & light / your usual) and explains why those
+three. Picking one out of fifty restaurants is search. Picking three restaurants
+that vary along an axis that matters *for this user at this moment* is judgment.
+That judgment is the product.
+
 ## Target User & Wedge
 
 Late-night arriving travelers. Wedge = the single seam: **arrival-time -> food-timing**.
@@ -38,10 +45,14 @@ Not a platform. One agent, one seam, done well.
 
 1. The pain is real but occasional. Acceptable for a portfolio piece — it demos
    *capability*, not retention.
-2. The product is **not** autonomous pre-staging. It is **predict -> curate ->
-   user authorizes payment**. The agent does all the work; the user taps once to
-   authorize the spend. (Revised from an earlier "autonomous commit" framing after
-   review.)
+2. The product is **not** autonomous pre-staging, and it is **not** about
+   payment authorization. The agent does all the heavy lifting — watches the
+   trip, predicts arrival, curates, re-times, and *designs a small choice set
+   of 2–3 meaningfully different options*. **The user takes the final call by
+   picking one. The pick is the terminal action.** No separate authorize step,
+   no payment UI in scope. Payment is offstage (Uber's existing card-on-file
+   plumbing), not a demo concept. (Revised twice: first from autonomous commit,
+   then from per-order payment-authorize, to the choice-from-options model.)
 3. The product lives or dies on **timing prediction**, which is a stack of
    uncertainties (landing -> deplane -> customs -> bags -> ride -> check-in). The
    agent must **re-time continuously** as actuals arrive. This loop is the core.
@@ -58,8 +69,8 @@ underneath when the architecture is probed. Rejected — defeats the purpose.
 
 ### Approach B: Real agent loop (chosen)
 Real tool-calling agent, event-driven re-timing loop, offline-restaurant recovery,
-one-tap authorize step. Built on a framework-agnostic core with per-framework
-adapters.
+choice-set design, and a single user pick as the terminal action. Built on a
+framework-agnostic core with per-framework adapters.
 
 ### Approach C: Re-timing simulator
 Narrow mechanism demo — scrub flight delay, watch the agent re-decide. Good idea,
@@ -73,8 +84,8 @@ folded into B as the reasoning-transparency view rather than built standalone.
   calculator, recovery policy, delegation envelope), event model, agent-loop contract.
 - **Primary adapter: LangGraph.** Best fit — the project is long-running,
   event-driven, stateful, human-in-the-loop. "Wait for ride-started then re-decide"
-  maps to graph state + checkpoint; "user authorizes payment" maps to a native
-  interrupt.
+  maps to graph state + checkpoint; "surface the choice set and wait for the
+  user's pick" maps to a native interrupt.
 - **Contrast adapter: raw / Agent SDK.** Same agent, roll-your-own orchestration —
   an honest comparison of framework vs hand-built.
 - **CrewAI / AutoGen: written evaluation only** (`docs/framework-comparison.md`).
@@ -93,10 +104,13 @@ taste matching; a vector DB would be complexity without payoff).
 ## Success Criteria
 
 - The agent completes a full delayed-flight scenario end to end: predicts, curates,
-  re-times at least twice, recovers from an offline restaurant, and produces a
-  ready-to-authorize order.
+  re-times at least twice, recovers from an offline restaurant, and surfaces a
+  designed choice set of 2–3 meaningfully different options for the user to pick from.
+- The choice set varies along an axis the agent picked deliberately for *this* user
+  at *this* moment — and the agent explains why those three.
 - The same agent runs on both the LangGraph and raw adapters from one core.
-- The reasoning at each re-time decision is visible (why it waited, why it acted).
+- The reasoning at each re-time decision is visible (why it waited, why it acted,
+  why these three options).
 
 ## Next Steps
 

@@ -1,12 +1,13 @@
-"""Domain: the delegation envelope.
+"""Domain: the curation envelope.
 
-Premise 2 made concrete. The user delegates ONCE, upfront, by setting a policy
-envelope. The agent then acts freely *within* that envelope — curating, re-timing,
-recovering — and only stops at the boundary the envelope defines: spending money.
-At that boundary it surfaces a draft for the user to authorize.
+Premise 2 made concrete. The user sets a policy envelope ONCE, upfront. The
+envelope shapes the agent's *curation* — what counts as a valid candidate
+restaurant for this user — not its authority to spend. Money is offstage; the
+envelope is purely the agent's filter on what to consider.
 
-The envelope is what makes "the agent does the work" safe. It is not a weaker
-agent; it is scoped delegation.
+The agent acts freely within the envelope (curating, re-timing, recovering) and
+stops at the choice moment: it surfaces 2-3 in-envelope options and the user
+picks one. The pick is the terminal action — no separate authorize step.
 
 Example envelope:
     after_hour: 22                  # only act for arrivals past 10pm

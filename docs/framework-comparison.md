@@ -5,13 +5,13 @@ The project deliberately separates a framework-agnostic **core** from per-framew
 the written half of that evaluation.
 
 The project's shape decides the fit: **long-running, event-driven, stateful,
-single-agent, human-in-the-loop at the spend boundary.** This is not a chat agent
+single-agent, human-in-the-loop at the choice moment.** This is not a chat agent
 and not a multi-agent crew. That rules frameworks in and out hard.
 
 | Framework | Core model | Fit | Built? |
 |-----------|-----------|-----|--------|
-| **LangGraph** | Graph / state machine, persistent state, checkpoints, interrupts | **Strong** — "wait then re-decide" is a graph transition; "authorize payment" is a native interrupt | Yes (primary) |
-| **Raw / Agent SDK** | Lightweight tool-calling loop | **Medium** — great for the loop; you hand-build state + the pause-for-auth step | Yes (contrast) |
+| **LangGraph** | Graph / state machine, persistent state, checkpoints, interrupts | **Strong** — "wait then re-decide" is a graph transition; "surface choice set and wait for user pick" is a native interrupt | Yes (primary) |
+| **Raw / Agent SDK** | Lightweight tool-calling loop | **Medium** — great for the loop; you hand-build state + the pause-for-pick step | Yes (contrast) |
 | **CrewAI** | Role-based multi-agent crew | **Weak** — one agent doing predict/curate/recover; no real roles to assign | No — evaluation only |
 | **AutoGen** | Conversational multi-agent | **Weak** — conversation-centric, not event-centric; a forced fit | No — evaluation only |
 

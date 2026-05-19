@@ -1,32 +1,26 @@
-"""Tool: draft_order / place_order — MOCKED.
+"""Tool: place_order — MOCKED.
 
 There is no public Uber Eats consumer API, so order placement is necessarily
 mocked. This is fine: the artifact demos the *agent*, not a prod integration.
 
-Two operations:
-  - draft_order:   build a ready-to-authorize order (the agent does this)
-  - place_order:   commit the order — ONLY after the user authorizes payment
-                   (Premise 2: predict -> curate -> user authorizes)
+The agent never commits an order on its own. The user picks one of the 2-3
+options the agent surfaces, and the pick IS the placement. Payment is offstage
+(Uber's existing card-on-file plumbing) and out of scope for this artifact —
+there is no separate authorize step, no spend UI, no money mechanics. The user
+takes the final call by choosing; everything else is the agent.
 
 Implementation: TODO.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
 
+def place_order(picked_option: dict) -> dict:
+    """Place the order the user picked from the agent's choice set.
 
-def draft_order(restaurant: dict, items: list[dict], target_delivery: datetime) -> dict:
-    """Build a draft order timed to land at `target_delivery`. Not committed.
+    Called when the user taps one of the 2-3 surfaced options. The pick IS
+    the terminal action — there is no separate authorize step.
 
-    Returns (shape TODO): restaurant, items, total, target_delivery, place_by_time.
-    """
-    raise NotImplementedError
-
-
-def place_order(draft: dict) -> dict:
-    """Commit a draft order. MUST only be called after explicit user authorization.
-
-    Returns (shape TODO): order_id, status, eta.
+    Returns (shape TODO): order_id, status, eta, restaurant, items, total.
     """
     raise NotImplementedError
