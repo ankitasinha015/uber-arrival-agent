@@ -10,6 +10,10 @@ dependencies = [
     "httpx>=0.27",
     "pydantic>=2.7",
     "python-dotenv>=1.0",
+    # Taste store — embedded vector DB for per-user past-pick similarity.
+    # Default embedding model (sentence-transformers/all-MiniLM-L6-v2) runs
+    # locally, no API key or cost. See DESIGN.md > "Taste store (Chroma)".
+    "chromadb>=0.5",
 ]
 
 [project.optional-dependencies]

@@ -95,11 +95,58 @@ folded into B as the reasoning-transparency view rather than built standalone.
 
 ## Stack
 
-LangGraph + Yelp Fusion API (restaurants + hours) + Maps API (ETA) + LLM.
+LangGraph + Yelp Fusion API (restaurants + hours) + Maps API (ETA) + LLM
++ **Chroma (embedded, local) for the taste store**.
 **Flight status and order placement are mocked** — flight APIs are flaky and rate-
 limited, and there is no public Uber Eats consumer API. The real external calls are
-Yelp and Maps. No vector DB (Yelp category tags + a simple preference filter cover
-taste matching; a vector DB would be complexity without payoff).
+Yelp, Maps, and the LLM. The taste store is in-process (Chroma's default embedded
+mode with file-on-disk persistence) — no separate service.
+
+## Taste store (Chroma)
+
+The agent gets meaningfully better as it sees more of a user's trips. Out of the
+box (no history), the choice set ranks candidates by Yelp category overlap with
+the user's declared `cuisines` envelope — fine, but coarse. With history, the
+agent ranks candidates by *semantic similarity to past well-rated picks*, which
+captures things tags can't: "user likes brothy noodle bowls but not stir-fries,
+even though both are Thai," or "user picks rice plates when tired, salads when
+not."
+
+How it works:
+
+- **Collection:** one Chroma collection per user, documents are past picks shaped
+  as `{restaurant_name, cuisine_tags, description, items_ordered, rating}`.
+  Stored as JSON-encoded text; embedded via Chroma's default model
+  (`sentence-transformers/all-MiniLM-L6-v2`, runs locally, no API key, no cost).
+- **Write path:** every completed order writes a new document. Rating is implicit
+  for the demo (we infer 4/5 unless the user later marks otherwise — out of scope
+  for v1 but the schema allows it).
+- **Read path:** when `choice_set.curate_candidates` runs, it queries the
+  collection with the current trip's context (`{time_of_day, fatigue_signal,
+  city, weather_if_available}`) and returns top-N candidates ranked by
+  similarity to the user's well-rated history. Yelp-tag filter still runs first
+  (envelope constraint); the taste store re-ranks within the filtered set.
+- **Persistence:** Chroma writes to `.chroma/` (gitignored). The deployed demo
+  ships with a pre-seeded `repeat-traveler` collection captured from the
+  `scenarios/repeat-traveler.json` seed.
+
+Why Chroma over alternatives:
+
+- **vs pgvector / Qdrant / Pinecone:** those are services. Chroma is embedded
+  (file-on-disk, zero ops). Right complexity for a portfolio demo.
+- **vs LanceDB:** comparable, but Chroma has more name recognition and a
+  simpler API for this shape of data. Either would work.
+- **vs no vector store (the original plan):** Yelp category tags get you 80% of
+  the way to taste matching with one user and a few cuisines. They break down
+  when the user has 50+ past picks and meaningful preference structure within
+  a cuisine. The taste store earns its existence once history exists — and the
+  `repeat-traveler.json` scenario makes the difference visible in the demo.
+
+Naive baseline contrast: the naive adapter at step 8 does NOT consult the taste
+store. It picks by Yelp rating alone. In the `repeat-traveler.json` run, this
+produces a visibly worse pick (a highly-rated stir-fry place when the user has
+never picked a stir-fry), which is exactly the contrast the framework comparison
+needs.
 
 ## Success Criteria
 
@@ -354,7 +401,12 @@ CONFIRMATION (after pick, in-place transition)
 2. Four tools — Yelp + Maps real, flight + order mock. **Instrument here so the
    metrics report is free.**
 3. Domain logic — re-timing, recovery, envelope, choice-set design (axis selection).
-4. LangGraph adapter against `delayed-flight.json`.
+3.5. **Taste store (Chroma)** — `core/domain/taste.py` wrapping a per-user Chroma
+   collection. `choice_set.curate_candidates` calls into it AFTER the envelope
+   filter and BEFORE the LLM axis selection. Default embedding model is local
+   (no API key). `scenarios/repeat-traveler.json` seeds a user with 8-12 past
+   picks across cities so the demo can show the taste store earning its keep.
+4. LangGraph adapter against `delayed-flight.json` AND `repeat-traveler.json`.
 5. `scenarios/no-supply.json` + run through the LangGraph adapter.
 6. Raw adapter (second `ArrivalAgent` implementation).
 7. `--compare` CLI + metrics report generator.

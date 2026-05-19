@@ -31,6 +31,10 @@ Thumbs.db
 *.log
 scratch/
 
+# Chroma taste store (file-on-disk persistence). Seeded data for the deployed
+# demo lives in scenarios/cache/ via the cache-capture step.
+.chroma/
+
 # Personal interview-prep doc — lives outside the repo at
 # ~/.gstack/projects/uber-arrival-agent/interview-prep.md
 docs/interview-prep.md
