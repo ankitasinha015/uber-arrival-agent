@@ -162,6 +162,192 @@ Architectural decisions made during this review:
 Full vision and per-decision rationale lives in
 `~/.gstack/projects/uber-arrival-agent/ceo-plans/2026-05-19-uber-arrival-agent.md`.
 
+## Design System (added 2026-05-19 from /plan-design-review)
+
+Visual direction: **editorial / restrained** (decision D1). Reference points: Linear,
+Stripe Docs, Vercel. The product's premise is "we did all the heavy lifting so the
+surface can be quiet" — the UI honors that. Restraint reads as taste in a landscape
+of AI-demo gradient soup.
+
+### Typography
+
+- **Body / UI:** Inter, weights 400 / 500 / 600. System fallback: -apple-system,
+  Segoe UI, sans-serif. Loaded from Google Fonts or self-hosted.
+- **Reasoning trace:** JetBrains Mono, weight 400 — hints at "system thinking" without
+  being kitschy. Used only for the streaming reasoning prose and the event timeline.
+- **Scale:**
+  - `--text-xs: 12px` (timeline, captions, dim labels)
+  - `--text-sm: 14px` (body in dense areas, card metadata)
+  - `--text-base: 16px` (body)
+  - `--text-lg: 18px` (subheadings)
+  - `--text-xl: 24px` (current-decision header in streaming view)
+  - `--text-2xl: 32px` (landing wordmark)
+- **Line height:** 1.5 on body, 1.3 on headers, 1.6 on reasoning trace (slightly
+  airier — long-form readability).
+
+### Color (CSS variables, dark-light pair)
+
+Light mode (default — interview demos usually happen in bright rooms):
+
+- `--bg: #FAFAFA` (off-white, not pure)
+- `--surface: #FFFFFF` (card backgrounds when needed)
+- `--ink: #0A0A0A` (primary text, near-black not pure)
+- `--ink-dim: #666666` (secondary text)
+- `--ink-faint: #999999` (tertiary, captions, dim labels)
+- `--rule: #E5E5E5` (hairline borders, dividers)
+- `--accent-ink: #0A0A0A` (primary action: black button on white)
+- `--accent-paper: #FFFFFF` (primary action text: white on black)
+- `--focus: #0066FF` (keyboard focus outline — the ONE non-neutral color)
+
+Dark mode (auto via `prefers-color-scheme: dark`): swap `--bg` ↔ `--ink`, `--surface` becomes #111, dims and rules adjust.
+
+**No accent color for visual decoration.** The only non-neutral pixel on the page
+is the focus outline. Restraint is the brand.
+
+### Spacing scale
+
+4 / 8 / 16 / 24 / 32 / 48 / 64 / 96 px. CSS variables `--space-1` through `--space-8`.
+No arbitrary values; if a spacing isn't on the scale, you're improvising.
+
+### Radii
+
+`--radius-sm: 4px` (buttons, inputs), `--radius-md: 8px` (cards). No large bubbly
+radii (the AI-slop signature). No fully rounded pills except for status dots.
+
+### Motion
+
+Functional motion only. Three motions allowed:
+1. Token-by-token text reveal in the streaming reasoning panel (~30ms per token).
+2. Choice cards fade in from 0 to 100% opacity over 240ms when the agent surfaces them.
+3. View transitions on route change (`view-transition-name` API; 200ms cross-fade).
+
+No decorative animation. No bounce. No spinning.
+
+### Layout — screen specs
+
+```
+LANDING (/)
+┌──────────────────────────────────────────────────────────────┐
+│ Top:    --space-12 padding                                   │
+│         "uber-arrival-agent" (text-2xl, body face, lowercase,│
+│           slightly tracked, --ink)                           │
+│                                                              │
+│         "An agent that watches your trip and times dinner    │
+│          to your arrival." (text-base, --ink-dim, max-       │
+│          width 540px, --space-4 below wordmark)              │
+│                                                              │
+│ Mid:    Two scenario cards, stacked, max-width 540px,        │
+│         --space-12 above. Each card: --space-6 padding,      │
+│         --rule border, --radius-md, hover/focus = ink fill.  │
+│         Inside each: "▶ Delayed flight" (text-lg) +          │
+│           "The standard demo" (text-sm, --ink-dim)           │
+│                                                              │
+│ Bottom: "source on github →" link, text-sm, --ink-faint,     │
+│         --space-16 below cards                               │
+└──────────────────────────────────────────────────────────────┘
+
+STREAMING (/run/:scenario)
+┌──────────────────────────────────────────────────────────────┐
+│ Header bar (--space-4 padding, --rule bottom):               │
+│   "← back" (text-sm)        "uber-arrival-agent" (text-sm)   │
+│                                                              │
+│ Main panel (max-width 720px, centered, --space-12 padding):  │
+│                                                              │
+│   CURRENT (text-xl --ink, body face):                        │
+│   "Waiting — flight delayed, too early to act"               │
+│                                                              │
+│   REASONING (text-base, JetBrains Mono, --ink, line-height   │
+│              1.6, --space-6 above): streams token-by-token   │
+│                                                              │
+│   ──── (--rule, --space-8 margin) ────                       │
+│                                                              │
+│   TIMELINE (text-xs, --ink-faint, JetBrains Mono):           │
+│   21:30 flight delayed                                       │
+│   23:35 on ground                                            │
+│   00:05 ride started ←                                       │
+│                                                              │
+│   Footer controls (--space-6 above, right-aligned):          │
+│   [1x] [4x] [skip ahead]  text-sm buttons, --rule border     │
+│                                                              │
+│ When choice cards arrive: they fade in inline below the      │
+│ reasoning, BEFORE the timeline section. 3 cards horizontal   │
+│ on desktop, stacked on mobile.                               │
+└──────────────────────────────────────────────────────────────┘
+
+CHOICE CARD (one of 3 in the surfaced set)
+┌────────────────────────────┐
+│ Lers Ros        (text-lg)  │
+│ Thai            (text-xs, --ink-faint)
+│                            │
+│ Pad see ew + dumplings     │
+│ (text-sm, --ink-dim)       │
+│                            │
+│ $28 · 22 min               │
+│ (text-sm, --ink)           │
+│                            │
+│ — divider —                │
+│ "Your usual late-night     │
+│  pick. Lowest variance     │
+│  on delivery time."        │
+│ (text-xs, --ink-dim,       │
+│  why_this_one)             │
+└────────────────────────────┘
+  Card: --surface bg, --rule border, --radius-md,
+  --space-5 padding, hover/focus = ink fill (card text inverts).
+
+After cards: "Why these three: you usually pick Thai, but it's late and you
+flew 6h — Pakwan if you want comfort food, Mixt if you just want to sleep."
+(text-sm, --ink-dim, italic, --space-4 below cards)
+
+CONFIRMATION (after pick, in-place transition)
+┌──────────────────────────────────────────────────────────────┐
+│ "Order placed." (text-xl --ink)                              │
+│ "Lers Ros — Pad see ew + dumplings. $28."                    │
+│ "Arriving 12:38, ~20 min after your check-in." (text-base    │
+│  --ink-dim)                                                  │
+│                                                              │
+│ "Watch again →" (text-sm link, --space-8 above)              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Interaction states
+
+| Surface | Loading | Empty | Error | Success |
+|---|---|---|---|---|
+| Landing | Instant (static) | N/A | "Couldn't load scenarios" + retry | (page renders) |
+| Streaming | "Connecting…" 1-line | N/A | "Agent paused — connection lost" + resume | Choice cards appear |
+| Choice cards | N/A | Breakfast fallback card (single, full-width) | Banner "fell back to default axis" above cards | Cards rendered |
+| Confirmation | Instant | N/A | "Order failed" + try again | "Order placed" + watch again |
+
+### Playback control (load-bearing)
+
+**Must include** `[1x] [4x] [skip ahead]` controls on the streaming view. Default 1x. An interviewer will not watch a 2-minute demo at 1x — they'll hit skip-ahead within 15s. Without these controls the demo dies.
+
+- 1x = real wall-clock time
+- 4x = scenario timeline ticks 4x faster (mock events fire faster, LLM calls unchanged)
+- Skip ahead = jump directly to next agent decision; if currently waiting, jump to next trip event
+
+### Responsive
+
+- **≤480px:** single column. Choice cards stack vertically. Timeline collapses to a `<details>` disclosure ("see trip events"). Current-decision text takes the full viewport width.
+- **481–1024px:** 1–2 column for cards. Reasoning panel full-width with --space-6 horizontal padding.
+- **>1024px:** 3 cards horizontal, reasoning panel max-width 720px centered.
+
+### Accessibility
+
+- Keyboard nav: Tab through scenarios, cards, controls. Focus outline: 2px `--focus` color, 2px offset.
+- ARIA: `<main role="region" aria-live="polite">` on the streaming panel — screen readers announce updates without spamming.
+- Touch targets: 44px minimum on all interactive elements. Cards are full tap targets, not just inner buttons.
+- Contrast: 4.5:1 minimum on body text, 7:1 on the large current-decision text.
+- Reduced motion: respect `prefers-reduced-motion` — disable token-by-token reveal, fade-ins become instant. Reasoning text appears all at once.
+
+### Implementation hints
+
+- Single static HTML file + minimal CSS, served by FastAPI. No framework.
+- Token streaming via SSE; render with vanilla JS appending to a `<div>`.
+- View transitions via the native `document.startViewTransition` API where supported (fallback: instant swap).
+- Font loading: preload Inter + JetBrains Mono in `<head>` to avoid FOUT on the demo.
+
 ## Revised implementation order
 
 1. Core contract + events ✅ DONE (commit `025a5af`)
@@ -181,3 +367,8 @@ Full vision and per-decision rationale lives in
 13. Record GIF of the live demo.
 14. Rewrite README around the GIF.
 15. Finish `docs/framework-comparison.md` with real numbers from step 7.
+
+**Implementation note on step 10 (frontend):** The Design System section above
+specifies typography, color, spacing, layout per screen, all interaction states,
+the mandatory playback controls, responsive breakpoints, and a11y requirements.
+Implementer should not improvise — re-decide nothing, just build to spec.
