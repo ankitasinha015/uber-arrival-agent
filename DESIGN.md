@@ -126,3 +126,58 @@ taste matching; a vector DB would be complexity without payoff).
 Build sequencing — whether to get LangGraph fully working before the raw adapter,
 or build both incrementally. Recommend LangGraph-first (prove the core against a
 real framework before abstracting further).
+
+## CEO Review Decisions (2026-05-19, SELECTIVE EXPANSION)
+
+Mode: SELECTIVE EXPANSION. Six expansion candidates accepted into scope to turn the
+locked product into a deployable, demo-able portfolio artifact:
+
+1. **Live demo URL** — FastAPI backend + static frontend, deployed on Fly.io.
+2. **Auto-generated framework metrics report** — `--compare` CLI runs both adapters,
+   emits LOC / tool calls / LLM calls / tokens / runtime as a markdown table.
+3. **Streaming "watch the agent think" UI** — SSE channel from the agent to the
+   browser, streaming each decision + reasoning as it happens.
+4. **Second scenario: `no-supply.json`** — exercises the graceful-degradation path
+   (nothing open near the hotel → breakfast fallback).
+5. **Polished README** — opens with an animated GIF of the live demo, not
+   installation instructions.
+6. **Naive baseline adapter** — third `ArrivalAgent` implementation that orders at
+   `ride_started` with no curation or re-timing. Used in `--compare` to show *why*
+   the smart parts matter.
+
+Architectural decisions made during this review:
+
+- **Web layer location (D4):** `src/arrival_agent/web/` as a new top-level directory.
+  `adapters/` stays pure — only `ArrivalAgent` implementations live there. The web
+  layer is a *consumer* of the core, not an adapter of it.
+- **Streaming protocol:** Server-Sent Events (SSE), not WebSocket. One-way agent →
+  browser is all that's needed; SSE works over plain HTTP, simpler to host, simpler
+  to debug.
+- **Public-demo API safety (D5):** The live demo replays from `scenarios/cache/`,
+  populated by capturing real Yelp + Maps responses during local development. Real
+  data feel, zero public quota risk, deterministic. Local dev still calls real APIs.
+- **Hosting target:** Fly.io (Python support, free tier with auto-suspend, custom
+  subdomain). Render is a fine fallback. Two-way door.
+
+Full vision and per-decision rationale lives in
+`~/.gstack/projects/uber-arrival-agent/ceo-plans/2026-05-19-uber-arrival-agent.md`.
+
+## Revised implementation order
+
+1. Core contract + events ✅ DONE (commit `025a5af`)
+2. Four tools — Yelp + Maps real, flight + order mock. **Instrument here so the
+   metrics report is free.**
+3. Domain logic — re-timing, recovery, envelope, choice-set design (axis selection).
+4. LangGraph adapter against `delayed-flight.json`.
+5. `scenarios/no-supply.json` + run through the LangGraph adapter.
+6. Raw adapter (second `ArrivalAgent` implementation).
+7. `--compare` CLI + metrics report generator.
+8. Naive adapter (third comparison point).
+9. `web/` — FastAPI backend wrapping the core.
+10. Static frontend with SSE streaming reasoning view.
+11. Capture real Yelp + Maps responses into `scenarios/cache/` and switch the
+    deployed agent to cache mode.
+12. Deploy to Fly.io.
+13. Record GIF of the live demo.
+14. Rewrite README around the GIF.
+15. Finish `docs/framework-comparison.md` with real numbers from step 7.
