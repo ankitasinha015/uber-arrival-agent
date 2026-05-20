@@ -6,7 +6,7 @@ actually open, and continuously **re-times** the delivery as real events arrive
 (flight landed, ride started, restaurant went offline). The user authorizes the
 payment with a single tap — the agent does everything else.
 
-Portfolio / interview artifact. See [`DESIGN.md`](./DESIGN.md) for the full design.
+See [`DESIGN.md`](./DESIGN.md) for the full design.
 
 ## Why it is an agent, not a notification
 
