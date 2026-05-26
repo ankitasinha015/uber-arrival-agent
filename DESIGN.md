@@ -95,17 +95,17 @@ folded into B as the reasoning-transparency view rather than built standalone.
 
 ## Stack
 
-LangGraph + Yelp Fusion API (restaurants + hours) + Maps API (ETA) + LLM
+LangGraph + Foursquare Places API (restaurants + hours) + Maps API (ETA) + LLM
 + **Chroma (embedded, local) for the taste store**.
 **Flight status and order placement are mocked** — flight APIs are flaky and rate-
 limited, and there is no public Uber Eats consumer API. The real external calls are
-Yelp, Maps, and the LLM. The taste store is in-process (Chroma's default embedded
+Foursquare, Maps, and the LLM. The taste store is in-process (Chroma's default embedded
 mode with file-on-disk persistence) — no separate service.
 
 ## Taste store (Chroma)
 
 The agent gets meaningfully better as it sees more of a user's trips. Out of the
-box (no history), the choice set ranks candidates by Yelp category overlap with
+box (no history), the choice set ranks candidates by Foursquare category overlap with
 the user's declared `cuisines` envelope — fine, but coarse. With history, the
 agent ranks candidates by *semantic similarity to past well-rated picks*, which
 captures things tags can't: "user likes brothy noodle bowls but not stir-fries,
@@ -124,7 +124,7 @@ How it works:
 - **Read path:** when `choice_set.curate_candidates` runs, it queries the
   collection with the current trip's context (`{time_of_day, fatigue_signal,
   city, weather_if_available}`) and returns top-N candidates ranked by
-  similarity to the user's well-rated history. Yelp-tag filter still runs first
+  similarity to the user's well-rated history. Foursquare-tag filter still runs first
   (envelope constraint); the taste store re-ranks within the filtered set.
 - **Persistence:** Chroma writes to `.chroma/` (gitignored). The deployed demo
   ships with a pre-seeded `repeat-traveler` collection captured from the
@@ -136,14 +136,14 @@ Why Chroma over alternatives:
   (file-on-disk, zero ops). Right complexity for a portfolio demo.
 - **vs LanceDB:** comparable, but Chroma has more name recognition and a
   simpler API for this shape of data. Either would work.
-- **vs no vector store (the original plan):** Yelp category tags get you 80% of
+- **vs no vector store (the original plan):** Foursquare category tags get you 80% of
   the way to taste matching with one user and a few cuisines. They break down
   when the user has 50+ past picks and meaningful preference structure within
   a cuisine. The taste store earns its existence once history exists — and the
   `repeat-traveler.json` scenario makes the difference visible in the demo.
 
 Naive baseline contrast: the naive adapter at step 8 does NOT consult the taste
-store. It picks by Yelp rating alone. In the `repeat-traveler.json` run, this
+store. It picks by Foursquare rating alone. In the `repeat-traveler.json` run, this
 produces a visibly worse pick (a highly-rated stir-fry place when the user has
 never picked a stir-fry), which is exactly the contrast the framework comparison
 needs.
@@ -162,7 +162,7 @@ needs.
 ## Next Steps
 
 1. Define the core contract + event model (`core/contract.py`, `core/events.py`).
-2. Implement the four tools — Yelp + Maps real, flight + order mocked.
+2. Implement the four tools — Foursquare + Maps real, flight + order mocked.
 3. Implement domain logic — re-timing calculator, recovery, envelope.
 4. Build the LangGraph adapter (primary), run the delayed-flight scenario.
 5. Build the raw adapter from the same core.
@@ -201,7 +201,7 @@ Architectural decisions made during this review:
   browser is all that's needed; SSE works over plain HTTP, simpler to host, simpler
   to debug.
 - **Public-demo API safety (D5):** The live demo replays from `scenarios/cache/`,
-  populated by capturing real Yelp + Maps responses during local development. Real
+  populated by capturing real Foursquare + Maps responses during local development. Real
   data feel, zero public quota risk, deterministic. Local dev still calls real APIs.
 - **Hosting target:** Fly.io (Python support, free tier with auto-suspend, custom
   subdomain). Render is a fine fallback. Two-way door.
@@ -398,7 +398,7 @@ CONFIRMATION (after pick, in-place transition)
 ## Revised implementation order
 
 1. Core contract + events ✅ DONE (commit `025a5af`)
-2. Four tools — Yelp + Maps real, flight + order mock. **Instrument here so the
+2. Four tools — Foursquare + Maps real, flight + order mock. **Instrument here so the
    metrics report is free.**
 3. Domain logic — re-timing, recovery, envelope, choice-set design (axis selection).
 3.5. **Taste store (Chroma)** — `core/domain/taste.py` wrapping a per-user Chroma
@@ -413,7 +413,7 @@ CONFIRMATION (after pick, in-place transition)
 8. Naive adapter (third comparison point).
 9. `web/` — FastAPI backend wrapping the core.
 10. Static frontend with SSE streaming reasoning view.
-11. Capture real Yelp + Maps responses into `scenarios/cache/` and switch the
+11. Capture real Foursquare + Maps responses into `scenarios/cache/` and switch the
     deployed agent to cache mode.
 12. Deploy to Fly.io.
 13. Record GIF of the live demo.
