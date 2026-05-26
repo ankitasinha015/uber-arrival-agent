@@ -3,8 +3,9 @@
 An agentic system at the seam between **Travel Mode** and **Eats**: it watches a
 traveler's trip, predicts when they will reach their hotel room, finds food that is
 actually open, and continuously **re-times** the delivery as real events arrive
-(flight landed, ride started, restaurant went offline). The user authorizes the
-payment with a single tap — the agent does everything else.
+(flight landed, ride started, restaurant went offline). At the right moment it
+surfaces two or three meaningfully different options and the user takes the final
+call by picking one — the agent does everything else.
 
 See [`DESIGN.md`](./DESIGN.md) for the full design.
 
