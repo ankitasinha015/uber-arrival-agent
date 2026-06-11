@@ -1,0 +1,131 @@
+{
+  "name": "repeat-traveler",
+  "description": "Same delayed-flight trip, but the user has 10 past picks seeded in the taste store. The agent should rank brothy-noodle and rice-plate places ABOVE stir-fries and pizza — even when both are tagged 'Thai' or 'American' — because that's what the user has historically rated 4-5/5.",
+  "itinerary": {
+    "user_id": "ankit_traveler",
+    "flight_no": "UA482",
+    "scheduled_arrival": "2026-05-20T22:55:00-07:00",
+    "airport": "SFO",
+    "hotel": "Marriott Marquis San Francisco, CA",
+    "past_picks": [
+      {
+        "restaurant_name": "Lers Ros Thai",
+        "cuisine_tags": ["Thai", "Noodles"],
+        "items_ordered": ["Boat noodle soup", "Chicken khao soi"],
+        "rating": 5,
+        "city": "San Francisco",
+        "timestamp": "2025-12-04T23:40:00-08:00"
+      },
+      {
+        "restaurant_name": "Phi Sushi",
+        "cuisine_tags": ["Japanese", "Sushi"],
+        "items_ordered": ["Chirashi bowl", "Miso soup"],
+        "rating": 5,
+        "city": "Los Angeles",
+        "timestamp": "2025-11-18T22:15:00-08:00"
+      },
+      {
+        "restaurant_name": "Pho 84",
+        "cuisine_tags": ["Vietnamese", "Soup", "Noodles"],
+        "items_ordered": ["Pho ga", "Spring rolls"],
+        "rating": 5,
+        "city": "Oakland",
+        "timestamp": "2025-10-30T21:00:00-07:00"
+      },
+      {
+        "restaurant_name": "Pakwan",
+        "cuisine_tags": ["Indian", "Pakistani"],
+        "items_ordered": ["Chicken tikka masala", "Garlic naan", "Basmati rice"],
+        "rating": 5,
+        "city": "San Francisco",
+        "timestamp": "2025-10-12T23:30:00-07:00"
+      },
+      {
+        "restaurant_name": "Mensho Tokyo",
+        "cuisine_tags": ["Japanese", "Ramen", "Noodles"],
+        "items_ordered": ["Tonkotsu ramen", "Gyoza"],
+        "rating": 5,
+        "city": "San Francisco",
+        "timestamp": "2025-09-22T22:45:00-07:00"
+      },
+      {
+        "restaurant_name": "Souvla",
+        "cuisine_tags": ["Greek", "Mediterranean"],
+        "items_ordered": ["Chicken souvlaki wrap"],
+        "rating": 4,
+        "city": "San Francisco",
+        "timestamp": "2025-08-15T20:30:00-07:00"
+      },
+      {
+        "restaurant_name": "House of Prime Rib",
+        "cuisine_tags": ["Steakhouse", "American"],
+        "items_ordered": ["Prime rib", "Yorkshire pudding"],
+        "rating": 3,
+        "city": "San Francisco",
+        "timestamp": "2025-07-08T19:30:00-07:00"
+      },
+      {
+        "restaurant_name": "Tony's Pizza Napoletana",
+        "cuisine_tags": ["Pizza", "Italian"],
+        "items_ordered": ["Margherita pizza"],
+        "rating": 3,
+        "city": "San Francisco",
+        "timestamp": "2025-06-22T21:00:00-07:00"
+      },
+      {
+        "restaurant_name": "Bamboo Wok",
+        "cuisine_tags": ["Chinese", "Stir-fry"],
+        "items_ordered": ["Beef and broccoli stir-fry", "Fried rice"],
+        "rating": 2,
+        "city": "Seattle",
+        "timestamp": "2025-05-30T22:00:00-07:00"
+      },
+      {
+        "restaurant_name": "Burger Joint",
+        "cuisine_tags": ["American", "Burgers"],
+        "items_ordered": ["Cheeseburger", "Fries"],
+        "rating": 2,
+        "city": "San Francisco",
+        "timestamp": "2025-04-18T23:00:00-07:00"
+      }
+    ]
+  },
+  "envelope": {
+    "after_hour": 22,
+    "max_total": 45,
+    "cuisines": [],
+    "no_supply_action": "schedule_breakfast"
+  },
+  "events": [
+    {
+      "type": "trip_booked",
+      "at": "2026-05-20T15:00:00-07:00",
+      "payload": { "note": "itinerary registered, agent starts watching" }
+    },
+    {
+      "type": "flight_status",
+      "at": "2026-05-20T21:30:00-07:00",
+      "payload": { "status": "delayed", "estimated_arrival": "2026-05-20T23:40:00-07:00" }
+    },
+    {
+      "type": "flight_status",
+      "at": "2026-05-20T23:35:00-07:00",
+      "payload": { "status": "on_ground", "actual_arrival": "2026-05-20T23:35:00-07:00" }
+    },
+    {
+      "type": "ride_started",
+      "at": "2026-05-21T00:05:00-07:00",
+      "payload": { "note": "tight ETA now available — agent can place the order" }
+    },
+    {
+      "type": "ride_ended",
+      "at": "2026-05-21T00:40:00-07:00",
+      "payload": { "note": "rider at hotel" }
+    },
+    {
+      "type": "check_in",
+      "at": "2026-05-21T00:52:00-07:00",
+      "payload": { "note": "anchor for the 20-min-after delivery target" }
+    }
+  ]
+}

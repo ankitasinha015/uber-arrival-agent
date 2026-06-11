@@ -10,10 +10,14 @@ dependencies = [
     "httpx>=0.27",
     "pydantic>=2.7",
     "python-dotenv>=1.0",
-    # Taste store — embedded vector DB for per-user past-pick similarity.
-    # Default embedding model (sentence-transformers/all-MiniLM-L6-v2) runs
-    # locally, no API key or cost. See DESIGN.md > "Taste store (Chroma)".
-    "chromadb>=0.5",
+    # Taste store: per-user vector similarity for past-pick taste matching.
+    # Implements cosine ranking directly with sentence-transformers + numpy
+    # (~80 lines). Originally planned chromadb; its 1.x Rust backend was
+    # unstable on Windows. See DESIGN.md > "Taste store" for the rationale.
+    "sentence-transformers>=3.0",
+    "numpy>=1.26",
+    # Anthropic SDK for the choice-set LLM call (used by core/domain/choice_set.py).
+    "anthropic>=0.39",
 ]
 
 [project.optional-dependencies]

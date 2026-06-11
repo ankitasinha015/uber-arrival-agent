@@ -31,8 +31,9 @@ Thumbs.db
 *.log
 scratch/
 
-# Chroma taste store (file-on-disk persistence). Seeded data for the deployed
-# demo lives in scenarios/cache/ via the cache-capture step.
+# Taste store (file-on-disk persistence — pickle per user). Seeded data for
+# the deployed demo lives in scenarios/cache/ via the cache-capture step.
+.taste/
 .chroma/
 
 # Personal interview-prep doc — lives outside the repo at

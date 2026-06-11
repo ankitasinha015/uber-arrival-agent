@@ -102,7 +102,7 @@ limited, and there is no public Uber Eats consumer API. The real external calls 
 Foursquare, Maps, and the LLM. The taste store is in-process (Chroma's default embedded
 mode with file-on-disk persistence) — no separate service.
 
-## Taste store (Chroma)
+## Taste store (sentence-transformers + numpy, direct cosine)
 
 The agent gets meaningfully better as it sees more of a user's trips. Out of the
 box (no history), the choice set ranks candidates by Foursquare category overlap with
@@ -114,29 +114,46 @@ not."
 
 How it works:
 
-- **Collection:** one Chroma collection per user, documents are past picks shaped
-  as `{restaurant_name, cuisine_tags, description, items_ordered, rating}`.
-  Stored as JSON-encoded text; embedded via Chroma's default model
-  (`sentence-transformers/all-MiniLM-L6-v2`, runs locally, no API key, no cost).
-- **Write path:** every completed order writes a new document. Rating is implicit
-  for the demo (we infer 4/5 unless the user later marks otherwise — out of scope
-  for v1 but the schema allows it).
-- **Read path:** when `choice_set.curate_candidates` runs, it queries the
-  collection with the current trip's context (`{time_of_day, fatigue_signal,
-  city, weather_if_available}`) and returns top-N candidates ranked by
-  similarity to the user's well-rated history. Foursquare-tag filter still runs first
-  (envelope constraint); the taste store re-ranks within the filtered set.
-- **Persistence:** Chroma writes to `.chroma/` (gitignored). The deployed demo
-  ships with a pre-seeded `repeat-traveler` collection captured from the
-  `scenarios/repeat-traveler.json` seed.
+- **Per-user store:** one pickle file per user (gitignored under `.taste/`).
+  Each pick is `{restaurant_name, cuisine_tags, items_ordered, rating, city,
+  timestamp}` paired with an embedding vector. Idempotent on re-seed
+  (deterministic id = `user_id::restaurant_name::timestamp`).
+- **Embedding:** sentence-transformers `all-MiniLM-L6-v2` (local, no API key,
+  no cost). Vectors are L2-normalized so cosine similarity is a dot product.
+  Model loads once per process (~3s first time, cached).
+- **Read path:** `rank_candidates(user_id, candidates)` embeds each
+  candidate's `name | categories | items` document and scores it against the
+  user's well-rated past picks (rating >= 4). Candidates with no positive
+  match keep their original (geographic-distance) order. Cold-start returns
+  the input unchanged.
+- **Demo seed:** `scenarios/repeat-traveler.json` carries 10 past picks under
+  `itinerary.past_picks`. The adapter calls `seed_from_scenario` before
+  driving the agent.
 
-Why Chroma over alternatives:
+Why a direct cosine store instead of Chroma:
 
-- **vs pgvector / Qdrant / Pinecone:** those are services. Chroma is embedded
-  (file-on-disk, zero ops). Right complexity for a portfolio demo.
-- **vs LanceDB:** comparable, but Chroma has more name recognition and a
-  simpler API for this shape of data. Either would work.
-- **vs no vector store (the original plan):** Foursquare category tags get you 80% of
+- The original plan was Chroma. In implementation, Chroma 1.x's Rust backend
+  crashes the test process on Windows (`_add`/`_upsert` access violation in
+  `chromadb/api/rust.py`). Older versions need a C++ compiler we don't have
+  for the `chroma-hnswlib` build.
+- For one user at portfolio scale (~10–100 picks per user), the math is ~80
+  lines of numpy. A managed vector DB would be infrastructure overhead
+  without a behavior gain at this scale.
+- We keep the *concept* — embeddings beat tag overlap once the user has
+  meaningful preference structure within a cuisine ("brothy noodles yes,
+  stir-fries no, both tagged Thai"). The implementation is a portfolio
+  conversation starter rather than a hidden dependency.
+- Talking point: "I evaluated Chroma but at this scale a direct cosine store
+  was simpler and equally fast" beats "I picked Chroma because the docs were
+  nice."
+
+(Historic note — the original analysis of vector-store alternatives below
+still applies if you ever do swap in a managed store at scale.)
+
+- **vs pgvector / Qdrant / Pinecone:** services. Overhead for one-user demo.
+- **vs LanceDB:** comparable embedded option; would work as a drop-in if
+  the direct numpy approach ever needed an HNSW index.
+- **vs no vector store (the very first plan):** Foursquare category tags get you 80% of
   the way to taste matching with one user and a few cuisines. They break down
   when the user has 50+ past picks and meaningful preference structure within
   a cuisine. The taste store earns its existence once history exists — and the
@@ -401,11 +418,12 @@ CONFIRMATION (after pick, in-place transition)
 2. Four tools — Foursquare + Maps real, flight + order mock. **Instrument here so the
    metrics report is free.**
 3. Domain logic — re-timing, recovery, envelope, choice-set design (axis selection).
-3.5. **Taste store (Chroma)** — `core/domain/taste.py` wrapping a per-user Chroma
-   collection. `choice_set.curate_candidates` calls into it AFTER the envelope
-   filter and BEFORE the LLM axis selection. Default embedding model is local
-   (no API key). `scenarios/repeat-traveler.json` seeds a user with 8-12 past
-   picks across cities so the demo can show the taste store earning its keep.
+3.5. **Taste store (sentence-transformers + numpy)** — `core/domain/taste.py`
+   per-user vector store, direct cosine ranking. Adapter calls
+   `rank_candidates` after the envelope filter and before the LLM axis
+   selection. Embedding model is local (no API key). `scenarios/repeat-
+   traveler.json` seeds a user with 10 past picks across cities so the demo
+   can show the taste store earning its keep.
 4. LangGraph adapter against `delayed-flight.json` AND `repeat-traveler.json`.
 5. `scenarios/no-supply.json` + run through the LangGraph adapter.
 6. Raw adapter (second `ArrivalAgent` implementation).
