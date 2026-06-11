@@ -13,7 +13,10 @@ from functools import lru_cache
 from dotenv import load_dotenv
 
 # Load .env from the current working directory / nearest parent. Idempotent.
-load_dotenv()
+# override=True: .env is the canonical source. A parent process that passes
+# down an empty value (some Claude Code / dev tool environments do this for
+# ANTHROPIC_API_KEY) would otherwise silently win over the real key in .env.
+load_dotenv(override=True)
 
 
 class MissingKey(RuntimeError):

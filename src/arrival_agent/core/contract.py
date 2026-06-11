@@ -64,7 +64,9 @@ class ChoiceOption(BaseModel):
     restaurant_name: str
     items: list[str]
     est_total: float
-    est_delivery_at: datetime
+    # Optional: filled by the adapter from the current room-arrival estimate.
+    # Choice-set design may run before the adapter has a delivery target locked.
+    est_delivery_at: datetime | None = None
     cuisine_tags: list[str] = Field(default_factory=list)
     why_this_one: str  # the agent's one-line rationale for including THIS option
 
