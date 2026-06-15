@@ -75,6 +75,8 @@ def test_drive_streams_to_placed(stub_tools):
             if kind is runner._CLOSE:
                 break
             messages.append((kind, payload))
+            if kind == "awaiting_consent":
+                runner.registry.submit_consent(run.run_id, True)
             if kind == "awaiting_pick":
                 runner.registry.submit_pick(run.run_id, payload["options"][0]["option_id"])
         await task
@@ -83,10 +85,12 @@ def test_drive_streams_to_placed(stub_tools):
     msgs = asyncio.run(run_it())
     kinds = [k for k, _ in msgs]
 
+    assert "awaiting_consent" in kinds                # the web demo asks first
     assert "awaiting_pick" in kinds
     assert kinds[-1] == "done"
     decisions = [p["decision"] for k, p in msgs if k == "decision"]
-    assert decisions[0]["action"] == "wait"          # opens with a WAIT
+    assert decisions[0]["action"] == "wait"          # opens with a WAIT (trip booked)
+    assert any(d["action"] == "ask" for d in decisions)     # then the opt-in ask
     assert any(d["action"] == "surface" for d in decisions)
     assert decisions[-1]["action"] == "placed"        # ends placed
     # the done message carries run metrics
@@ -104,6 +108,8 @@ def test_drive_surfaces_a_choice_set(stub_tools):
             kind, payload = await run.queue.get()
             if kind is runner._CLOSE:
                 break
+            if kind == "awaiting_consent":
+                runner.registry.submit_consent(run.run_id, True)
             if kind == "awaiting_pick":
                 awaiting = payload
                 runner.registry.submit_pick(run.run_id, payload["options"][0]["option_id"])
@@ -143,6 +149,12 @@ def test_create_run_unknown_scenario_404():
 def test_pick_on_unknown_run_409():
     client = TestClient(app)
     r = client.post("/api/run/deadbeef/pick", json={"option_id": "opt-1"})
+    assert r.status_code == 409
+
+
+def test_consent_on_unknown_run_409():
+    client = TestClient(app)
+    r = client.post("/api/run/deadbeef/consent", json={"consent": True})
     assert r.status_code == 409
 
 

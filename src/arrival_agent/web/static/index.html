@@ -97,6 +97,18 @@ header.bar{display:flex; justify-content:space-between; align-items:center;
 /* focus ring */
 :focus-visible{outline:2px solid var(--focus); outline-offset:2px;}
 
+/* consent ask */
+.ask{margin-top:var(--s4);max-width:560px}
+.ask-prompt{font-size:18px;line-height:1.5;color:var(--ink);margin:0 0 var(--s3)}
+.ask-actions{display:flex;gap:var(--s2)}
+.ask-actions button{
+  font-family:var(--sans);font-size:14px;padding:var(--s2) var(--s3);
+  border-radius:8px;cursor:pointer;border:1px solid var(--rule);background:var(--bg)
+}
+.ask-actions button.ask-yes{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.ask-actions button.ask-yes:focus-visible,.ask-actions button.ask-no:focus-visible{outline:2px solid #0066FF;outline-offset:2px}
+.ask-actions button.ask-no{color:var(--ink-faint)}
+
 /* responsive */
 @media (max-width:760px){
   .wrap{padding:var(--s5) var(--s3)}
@@ -131,6 +143,14 @@ header.bar{display:flex; justify-content:space-between; align-items:center;
     <div class="current" id="current" aria-live="polite"></div>
     <div class="reasoning" id="reasoning" aria-live="polite"></div>
 
+    <div id="ask" class="ask hidden">
+      <p class="ask-prompt" id="ask-prompt"></p>
+      <div class="ask-actions">
+        <button class="ask-yes" id="ask-yes">Yes, sort it out</button>
+        <button class="ask-no" id="ask-no">No thanks</button>
+      </div>
+    </div>
+
     <div id="choice" class="hidden">
       <div class="choice-intro" id="choice-intro"></div>
       <div class="cards" id="cards"></div>
@@ -163,7 +183,7 @@ const reduced = matchMedia('(prefers-reduced-motion:reduce)').matches;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 let runId = null, es = null, speed = 1, skipping = false;
-let queue = [], pumping = false, pickSubmitted = false;
+let queue = [], pumping = false, pickSubmitted = false, consentSubmitted = false;
 
 // --- landing ---------------------------------------------------------------
 async function loadScenarios(){
@@ -188,17 +208,19 @@ async function startRun(name){
   runId = r.run_id;
   es = new EventSource(`/api/run/${runId}/stream`);
   es.addEventListener('decision', e => enqueue('decision', JSON.parse(e.data)));
+  es.addEventListener('awaiting_consent', e => enqueue('awaiting_consent', JSON.parse(e.data)));
   es.addEventListener('awaiting_pick', e => enqueue('awaiting_pick', JSON.parse(e.data)));
   es.addEventListener('done', e => enqueue('done', JSON.parse(e.data)));
   es.addEventListener('error', e => { try{ enqueue('error', JSON.parse(e.data)); }catch(_){} });
 }
 
 function resetView(){
-  queue = []; pumping = false; pickSubmitted = false; skipping = false; speed = 1;
+  queue = []; pumping = false; pickSubmitted = false; consentSubmitted = false; skipping = false; speed = 1;
   setSpeedButtons();
   $('#current').textContent = '';
   $('#reasoning').innerHTML = '';
   $('#timeline').innerHTML = '';
+  $('#ask').classList.add('hidden');
   $('#choice').classList.add('hidden');
   $('#cards').innerHTML = '';
   $('#why-these').textContent = '';
@@ -220,7 +242,7 @@ async function pump(){
   pumping = false;
 }
 
-const VERBS = {wait:'Waiting', surface:'Here are your options', placed:'Order placed'};
+const VERBS = {wait:'Waiting', ask:'A quick check', surface:'Here are your options', placed:'Order placed'};
 
 async function reveal(kind, data){
   if (kind === 'decision'){
@@ -230,6 +252,8 @@ async function reveal(kind, data){
     $('#current').textContent = VERBS[d.action] || d.action;
     await addReasoning(data.event_type, d.reasoning);
     if (d.action === 'surface' && d.choice_set){ renderCards(d); }
+  } else if (kind === 'awaiting_consent'){
+    showAsk(data.prompt);
   } else if (kind === 'awaiting_pick'){
     $('#current').textContent = 'Pick one — we’ll have it timed to your door';
   } else if (kind === 'done'){
@@ -297,6 +321,23 @@ async function pick(optionId){
   await fetch(`/api/run/${runId}/pick`, {method:'POST', headers:{'content-type':'application/json'},
     body: JSON.stringify({option_id: optionId})});
   $('#choice').classList.add('hidden');
+}
+
+// --- consent ask -----------------------------------------------------------
+function showAsk(prompt){
+  $('#ask-prompt').textContent = prompt || 'Want me to handle dinner for when you arrive?';
+  $('#ask').classList.remove('hidden');
+  $('#ask-yes').onclick = () => consent(true);
+  $('#ask-no').onclick = () => consent(false);
+}
+
+async function consent(yes){
+  if (consentSubmitted) return;
+  consentSubmitted = true;
+  $('#ask').classList.add('hidden');
+  if (!yes) $('#current').textContent = 'No problem — I’ll stay out of it.';
+  await fetch(`/api/run/${runId}/consent`, {method:'POST', headers:{'content-type':'application/json'},
+    body: JSON.stringify({consent: !!yes})});
 }
 
 function showConfirm(d){

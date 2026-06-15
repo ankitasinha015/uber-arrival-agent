@@ -50,7 +50,8 @@ DELIVER_AFTER_ARRIVAL_MIN = 20
 class RawArrivalAgent(ArrivalAgent):
     """ArrivalAgent backed by a hand-built loop — no framework."""
 
-    def __init__(self, scenario: Scenario, *, taste_store=None, thread_id: str = "run"):
+    def __init__(self, scenario: Scenario, *, taste_store=None, thread_id: str = "run",
+                 ask_first: bool = False):
         self._scenario = scenario
         self._envelope = DelegationEnvelope(**scenario.envelope)
         self._hotel = scenario.itinerary.get("hotel", "")
@@ -59,10 +60,12 @@ class RawArrivalAgent(ArrivalAgent):
         self._scheduled = datetime.fromisoformat(sched) if isinstance(sched, str) else sched
         self._taste = taste_store
         self._user_id = scenario.itinerary.get("user_id")
+        self._ask_first = ask_first
 
         # hand-rolled state (LangGraph would checkpoint this for us)
         self._events: list[TripEvent] = []
         self._ride_eta: int | None = None
+        self._asked = False              # have we emitted the opt-in ASK?
         self._await = False
         self._options: list[ChoiceOption] = []
         self._candidates: list[dict] = []
@@ -110,6 +113,45 @@ class RawArrivalAgent(ArrivalAgent):
         )
         self._room_arrival = timing.estimate.estimated_at
 
+        # Consent beat (ask_first): no work until the user opts in.
+        if self._ask_first:
+            opted_in = self._consent()
+            if opted_in is False:
+                return AgentDecision(
+                    action=Action.WAIT,
+                    reasoning="you asked me to stay out of it — not lining up dinner",
+                    room_arrival_estimate=self._room_arrival,
+                )
+            if opted_in is None:
+                has_flight = any(e.type == EventType.FLIGHT_STATUS for e in self._events)
+                if not self._asked and has_flight and self._envelope.should_engage(self._room_arrival):
+                    self._asked = True  # 1B: ask once on the late-arrival signal
+                    prompt = (
+                        f"You'll reach your room around {self._room_arrival:%H:%M} and "
+                        f"kitchens near your hotel close soon. Want me to line up dinner, "
+                        f"timed to your arrival? You'll still pick the spot."
+                    )
+                    return AgentDecision(
+                        action=Action.ASK,
+                        reasoning=(
+                            f"predicting a late arrival (~{self._room_arrival:%H:%M}) — "
+                            f"checking whether you want dinner handled"
+                        ),
+                        room_arrival_estimate=self._room_arrival,
+                        ask_prompt=prompt,
+                    )
+                if self._asked:  # 2A: asked, no answer yet -> stay silent
+                    return AgentDecision(
+                        action=Action.WAIT,
+                        reasoning="asked about dinner; waiting for your answer before doing anything",
+                        room_arrival_estimate=self._room_arrival,
+                    )
+                # not yet a flight signal -> fall through to the normal wait below
+            elif opted_in is True and timing.action == "act" and now > timing.place_by:
+                self._notes.append(  # 3A: honest about a late opt-in
+                    "you opted in late, so this lands a little after you're in the room"
+                )
+
         if timing.action != "act" or not self._envelope.should_engage(self._room_arrival):
             reason = timing.reason
             if timing.action == "act":
@@ -123,6 +165,13 @@ class RawArrivalAgent(ArrivalAgent):
             )
 
         return self._act()
+
+    def _consent(self) -> bool | None:
+        """Latest opt-in answer from the events seen so far (None until answered)."""
+        consents = [e for e in self._events if e.type == EventType.USER_CONSENT]
+        if not consents:
+            return None
+        return bool(max(consents, key=lambda e: e.at).parsed().consent)
 
     def _act(self) -> AgentDecision:
         raw = restaurants_mod.get_eats_options(self._hotel, limit=10)

@@ -34,6 +34,7 @@ class Action(str, Enum):
     """What the agent decided to do at this step."""
 
     WAIT = "wait"          # current estimate too loose, or not yet time, or no supply
+    ASK = "ask"            # ask the user to opt in before doing any work (consent beat)
     SURFACE = "surface"    # surface a choice set to the user
     PLACED = "placed"      # user picked; order has been placed (terminal)
 
@@ -76,6 +77,7 @@ class AgentDecision(BaseModel):
 
     Fields are populated per `action`:
       - WAIT:    reasoning + room_arrival_estimate (loose is fine, just be honest)
+      - ASK:     reasoning + room_arrival_estimate + ask_prompt (the opt-in question)
       - SURFACE: reasoning + room_arrival_estimate + axis + choice_set + why_these
       - PLACED:  reasoning + placed_option_id
     """
@@ -83,6 +85,9 @@ class AgentDecision(BaseModel):
     action: Action
     reasoning: str
     room_arrival_estimate: datetime | None = None
+
+    # ASK only — the one-line opt-in question shown to the user before any work.
+    ask_prompt: str | None = None
 
     # SURFACE only
     axis: ChoiceAxis | None = None

@@ -32,7 +32,11 @@ NAIVE_COURIER_MIN = 12
 class NaiveArrivalAgent(ArrivalAgent):
     """Orders at ride-start with no timing, no choice set, no recovery."""
 
-    def __init__(self, scenario: Scenario, *, taste_store=None, thread_id: str = "run"):
+    def __init__(self, scenario: Scenario, *, taste_store=None, thread_id: str = "run",
+                 ask_first: bool = False):
+        # ask_first is accepted for a uniform constructor across adapters but
+        # ignored on purpose: the naive baseline never asks, never waits, never
+        # curates. That it skips the consent beat too is part of the contrast.
         self._scenario = scenario
         self._hotel = scenario.itinerary.get("hotel", "")
         self._events: list[TripEvent] = []

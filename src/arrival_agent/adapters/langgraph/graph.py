@@ -70,6 +70,7 @@ class GraphState(TypedDict, total=False):
 
     events: Annotated[list[dict], operator.add]
     ride_eta_min: int | None
+    asked: bool                    # have we already emitted the opt-in ASK?
     timing: dict | None            # latest decide_timing result, serialized
     candidates: list[dict]         # post-envelope (or relaxed) candidate pool
     curation_note: str | None      # e.g. "envelope relaxed" — surfaced in reasoning
@@ -95,6 +96,7 @@ class LangGraphArrivalAgent(ArrivalAgent):
         *,
         taste_store=None,
         thread_id: str = "run",
+        ask_first: bool = False,
     ):
         self._scenario = scenario
         self._envelope = DelegationEnvelope(**scenario.envelope)
@@ -106,9 +108,23 @@ class LangGraphArrivalAgent(ArrivalAgent):
         )
         self._taste = taste_store
         self._user_id = scenario.itinerary.get("user_id")
+        # When True, the agent opens with a consent beat: on the first late-arrival
+        # signal it ASKs the user once, then only curates if they opt in. The
+        # framework comparison and CLI leave this off so the orchestration metrics
+        # stay clean; the web demo turns it on (it's the product's legible opening).
+        self._ask_first = ask_first
         self._config = {"configurable": {"thread_id": thread_id}}
         self._awaiting_pick = False
         self._graph = self._build()
+
+    @staticmethod
+    def _consent_from_events(events: list[TripEvent]) -> bool | None:
+        """Latest opt-in answer: True/False once the user has answered the ask,
+        None until then. Event-sourced so it survives checkpoint replay."""
+        consents = [e for e in events if e.type == EventType.USER_CONSENT]
+        if not consents:
+            return None
+        return bool(max(consents, key=lambda e: e.at).parsed().consent)
 
     # --- graph construction -------------------------------------------------
 
@@ -116,19 +132,29 @@ class LangGraphArrivalAgent(ArrivalAgent):
         g = StateGraph(GraphState)
         g.add_node("predict", self._predict)
         g.add_node("record_wait", self._record_wait)
+        g.add_node("ask", self._ask)
         g.add_node("curate", self._curate)
         g.add_node("no_supply", self._no_supply)
         g.add_node("design", self._design)
         g.add_node("surface", self._surface)
         g.add_node("place", self._place)
 
+        def _route(s: GraphState) -> str:
+            a = (s.get("timing") or {}).get("action")
+            if a == "act":
+                return "act"
+            if a == "ask":
+                return "ask"
+            return "wait"
+
         g.add_edge(START, "predict")
         g.add_conditional_edges(
             "predict",
-            lambda s: "act" if (s.get("timing") or {}).get("action") == "act" else "wait",
-            {"wait": "record_wait", "act": "curate"},
+            _route,
+            {"wait": "record_wait", "act": "curate", "ask": "ask"},
         )
         g.add_edge("record_wait", END)
+        g.add_edge("ask", END)
         g.add_conditional_edges(
             "curate",
             lambda s: "some" if s.get("candidates") else "none",
@@ -184,6 +210,36 @@ class LangGraphArrivalAgent(ArrivalAgent):
                 f"window (after_hour={self._envelope.after_hour}) — staying quiet"
             )
 
+        # Consent beat (ask_first). The agent does no work until the user opts in.
+        late_optin = False
+        if self._ask_first:
+            opted_in = self._consent_from_events(events)
+            asked = bool(state.get("asked"))
+            has_flight = any(e.type == EventType.FLIGHT_STATUS for e in events)
+            if opted_in is False:
+                action, reason = "wait", (
+                    "you asked me to stay out of it — not lining up dinner"
+                )
+            elif opted_in is None:
+                # 1B: ask once when a flight signal puts arrival in the late window.
+                if not asked and has_flight and self._envelope.should_engage(room_arrival):
+                    action = "ask"
+                    reason = (
+                        f"predicting a late arrival (~{room_arrival:%H:%M}) — "
+                        f"checking whether you want dinner handled"
+                    )
+                else:
+                    # 2A: asked already + no answer => stay silent, never curate.
+                    action = "wait"
+                    reason = (
+                        "asked about dinner; waiting for your answer before doing anything"
+                        if asked else reason
+                    )
+            else:
+                # opted in: proceed on the normal timing decision. 3A: flag a late
+                # opt-in so the surface can be honest about delivery timing.
+                late_optin = action == "act" and now > timing.place_by
+
         return {
             "ride_eta_min": ride_eta,
             "timing": {
@@ -193,6 +249,25 @@ class LangGraphArrivalAgent(ArrivalAgent):
                 "uncertainty_min": timing.estimate.uncertainty_minutes,
                 "grade": timing.estimate.grade,
                 "place_by": timing.place_by.isoformat(),
+                "late_optin": late_optin,
+            },
+        }
+
+    def _ask(self, state: GraphState) -> dict:
+        t = state["timing"]
+        room_arrival = datetime.fromisoformat(t["room_arrival"])
+        prompt = (
+            f"You'll reach your room around {room_arrival:%H:%M} and kitchens near "
+            f"your hotel close soon. Want me to line up dinner, timed to your arrival? "
+            f"You'll still pick the spot."
+        )
+        return {
+            "asked": True,
+            "decision": {
+                "action": "ask",
+                "reasoning": t["reason"],
+                "room_arrival": t["room_arrival"],
+                "ask_prompt": prompt,
             },
         }
 
@@ -286,13 +361,17 @@ class LangGraphArrivalAgent(ArrivalAgent):
         for o in options:
             o.est_delivery_at = deliver_at
             opts.append(_option_dict(o))
+        note = state.get("curation_note")
+        if t.get("late_optin"):  # 3A: honest about a late opt-in
+            late = "you opted in late, so this lands a little after you're in the room"
+            note = f"{note}; {late}" if note else late
         return {
             "choice_payload": {
                 "axis": axis.value,
                 "axis_reason": axis_reason,
                 "why_these": why_these,
                 "room_arrival": t["room_arrival"],
-                "curation_note": state.get("curation_note"),
+                "curation_note": note,
                 "options": opts,
             }
         }
@@ -408,6 +487,13 @@ class LangGraphArrivalAgent(ArrivalAgent):
 
     def _terminal_decision(self, result: dict) -> AgentDecision:
         d = result.get("decision") or {}
+        if d.get("action") == "ask":
+            return AgentDecision(
+                action=Action.ASK,
+                reasoning=d["reasoning"],
+                room_arrival_estimate=d.get("room_arrival"),
+                ask_prompt=d.get("ask_prompt"),
+            )
         if d.get("action") == "placed":
             return AgentDecision(
                 action=Action.PLACED,

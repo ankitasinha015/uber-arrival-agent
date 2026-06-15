@@ -43,6 +43,7 @@ class EventType(str, Enum):
     RIDE_ENDED = "ride_ended"            # rider at the hotel
     ORDER_REJECTED = "order_rejected"    # restaurant went offline — recovery branch
     CHECK_IN = "check_in"                # rider checked in — anchor for "20 min after"
+    USER_CONSENT = "user_consent"        # user answered the opt-in ask (yes/no)
     USER_PICK = "user_pick"              # user picked one of the surfaced options
 
 
@@ -88,6 +89,14 @@ class CheckInPayload(BaseModel):
     note: str | None = None
 
 
+class UserConsentPayload(BaseModel):
+    """The user answered the agent's opt-in ask. `consent=True` lets the agent
+    proceed (predict → curate → surface); `consent=False` sends it dormant for
+    the rest of the trip. Arrives only after the agent emitted an ASK."""
+
+    consent: bool
+
+
 class UserPickPayload(BaseModel):
     """The user picked one of the agent's surfaced options. This event is the
     terminal trigger — the agent places the picked order and the loop ends."""
@@ -102,6 +111,7 @@ _PAYLOAD_MODELS: dict[EventType, type[BaseModel]] = {
     EventType.RIDE_ENDED: RideEndedPayload,
     EventType.ORDER_REJECTED: OrderRejectedPayload,
     EventType.CHECK_IN: CheckInPayload,
+    EventType.USER_CONSENT: UserConsentPayload,
     EventType.USER_PICK: UserPickPayload,
 }
 

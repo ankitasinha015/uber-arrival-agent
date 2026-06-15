@@ -66,9 +66,11 @@ class Run:
     # loop happened to exist, or fail when there is none).
     queue: asyncio.Queue | None = None
     pick: asyncio.Future | None = None
+    consent: asyncio.Future | None = None
     metrics: metrics.Metrics | None = None
     started: bool = False
     awaiting_pick: bool = False
+    awaiting_consent: bool = False
 
 
 class RunRegistry:
@@ -91,13 +93,23 @@ class RunRegistry:
             taste = TasteStore(in_memory=True)
             taste.seed_from_scenario(sc)
 
-        agent = LangGraphArrivalAgent(scenario=sc, taste_store=taste, thread_id=str(uuid4()))
+        # The web demo is the product: it opens with the consent beat (ask_first).
+        agent = LangGraphArrivalAgent(
+            scenario=sc, taste_store=taste, thread_id=str(uuid4()), ask_first=True
+        )
         run = Run(run_id=uuid4().hex[:12], scenario=sc, agent=agent)
         self._runs[run.run_id] = run
         return run
 
     def get(self, run_id: str) -> Run | None:
         return self._runs.get(run_id)
+
+    def submit_consent(self, run_id: str, consent: bool) -> bool:
+        run = self._runs.get(run_id)
+        if run is None or not run.awaiting_consent or run.consent is None or run.consent.done():
+            return False
+        run.consent.set_result(consent)
+        return True
 
     def submit_pick(self, run_id: str, option_id: str) -> bool:
         run = self._runs.get(run_id)
@@ -125,6 +137,23 @@ async def drive(run: Run) -> None:
             flight.advance_clock(ev.at)
             last = await asyncio.to_thread(run.agent.handle_event, ev)
             await run.queue.put(("decision", _serialize_decision(ev, last)))
+
+            # Consent beat: the agent asked whether to handle dinner. Park here,
+            # wait for the user's yes/no, feed it back as a USER_CONSENT event,
+            # then keep replaying the timeline (a "no" sends the agent dormant).
+            if last.action == Action.ASK:
+                run.consent = loop.create_future()
+                run.awaiting_consent = True
+                await run.queue.put(("awaiting_consent", {"prompt": last.ask_prompt}))
+                consent = await run.consent
+                run.awaiting_consent = False
+                consent_ev = TripEvent(
+                    type=EventType.USER_CONSENT,
+                    at=ev.at + timedelta(seconds=30),
+                    payload={"consent": consent},
+                )
+                last = await asyncio.to_thread(run.agent.handle_event, consent_ev)
+                await run.queue.put(("decision", _serialize_decision(consent_ev, last)))
 
         # Parked at the choice moment: wait for the user's pick.
         if last is not None and last.action == Action.SURFACE and last.choice_set:

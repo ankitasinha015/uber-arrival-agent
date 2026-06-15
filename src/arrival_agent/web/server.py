@@ -38,6 +38,10 @@ class RunRequest(BaseModel):
     scenario: str = "delayed-flight"
 
 
+class ConsentRequest(BaseModel):
+    consent: bool
+
+
 class PickRequest(BaseModel):
     option_id: str
 
@@ -89,6 +93,14 @@ async def stream(run_id: str):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.post("/api/run/{run_id}/consent")
+def submit_consent(run_id: str, req: ConsentRequest):
+    ok = runner.registry.submit_consent(run_id, req.consent)
+    if not ok:
+        return JSONResponse({"error": "run not awaiting consent"}, status_code=409)
+    return {"ok": True}
 
 
 @app.post("/api/run/{run_id}/pick")
