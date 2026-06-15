@@ -93,6 +93,9 @@ src/arrival_agent/
   adapters/
     langgraph/      primary: StateGraph + checkpointer + a native interrupt at
                     the choice moment
+    raw/            contrast: the same agent hand-rolled, no framework
+    naive/          baseline: orders too early, no choice-set design (the strawman)
+  compare.py        run all three, emit a metrics table (LOC / tokens / timing)
   web/              FastAPI + SSE — stream the agent's reasoning to the browser
 scenarios/          mock event timelines (+ recorded cache/ for replay)
 ```
@@ -116,8 +119,23 @@ The loop, on the LangGraph adapter:
 LangGraph fits because the trip is **long-running, event-driven, and stateful**, with
 a **human in the loop at one specific moment** — "wait for the ride, then re-decide"
 is a graph transition, and "surface the choice set and wait for the pick" is a native
-interrupt. (The raw-loop and naive-baseline adapters, plus a side-by-side metrics
-comparison, are the next phase — see [`docs/framework-comparison.md`](docs/framework-comparison.md).)
+interrupt.
+
+The same agent also runs on a hand-rolled loop and a deliberately-dumb baseline, so
+they can be measured side by side (`arrival-agent --compare`):
+
+| Adapter | LOC | LLM calls | Ordered |
+|---------|-----|-----------|---------|
+| LangGraph | 344 | 1 | Super Duper Burgers @ 01:12 |
+| raw | 182 | 1 | Super Duper Burgers @ 01:12 |
+| naive | 53 | 0 | Ippudo @ **00:32** — ~40 min before the rider arrives |
+
+LangGraph and the raw loop place the *identical* order (a conformance test proves
+they're equivalent) — so the framework's value isn't fewer lines (it's 2x more), it's
+checkpointed state and a real interrupt that the raw loop fakes with flags and would
+lose on a restart. The naive baseline orders too early, for the nearest place, with no
+LLM call: that `00:32` vs `01:12` gap is the whole product. Full write-up in
+[`docs/framework-comparison.md`](docs/framework-comparison.md).
 
 ---
 

@@ -55,6 +55,8 @@ def main() -> None:
     p.add_argument("--pick", type=int, default=1,
                    help="which option to auto-pick when the timeline ends mid-choice (1-based)")
     p.add_argument("--no-taste", action="store_true", help="disable the taste store")
+    p.add_argument("--compare", action="store_true",
+                   help="run all three adapters on the scenario and print a metrics table")
     args = p.parse_args()
 
     path = Path(args.scenario)
@@ -68,9 +70,19 @@ def main() -> None:
     if cache_mode != "off":
         print(f"cache: {cache_mode}")
 
-    if args.adapter != "langgraph":
-        sys.exit(f"adapter {args.adapter!r} is not built yet (step 6/8) — use langgraph")
-    from arrival_agent.adapters.langgraph.graph import LangGraphArrivalAgent
+    if args.compare:
+        from arrival_agent import compare as compare_mod
+        print(compare_mod.compare(sc.name, pick=args.pick))
+        return
+
+    _ADAPTERS = {
+        "langgraph": ("arrival_agent.adapters.langgraph.graph", "LangGraphArrivalAgent"),
+        "raw": ("arrival_agent.adapters.raw.loop", "RawArrivalAgent"),
+        "naive": ("arrival_agent.adapters.naive.loop", "NaiveArrivalAgent"),
+    }
+    import importlib
+    mod_path, cls_name = _ADAPTERS[args.adapter]
+    AgentCls = getattr(importlib.import_module(mod_path), cls_name)
 
     taste_store = None
     if not args.no_taste and sc.itinerary.get("past_picks") and cache_mode != "replay":
@@ -81,7 +93,7 @@ def main() -> None:
 
     flight.set_active_scenario(sc)
     m = metrics.start_run()
-    agent = LangGraphArrivalAgent(scenario=sc, taste_store=taste_store)
+    agent = AgentCls(scenario=sc, taste_store=taste_store)
 
     print(f"=== {sc.name}: {sc.description}")
     last_decision: AgentDecision | None = None

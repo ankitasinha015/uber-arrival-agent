@@ -11,7 +11,8 @@ and not a multi-agent crew. That rules frameworks in and out hard.
 | Framework | Core model | Fit | Built? |
 |-----------|-----------|-----|--------|
 | **LangGraph** | Graph / state machine, persistent state, checkpoints, interrupts | **Strong** — "wait then re-decide" is a graph transition; "surface choice set and wait for user pick" is a native interrupt | Yes (primary) |
-| **Raw / Agent SDK** | Lightweight tool-calling loop | **Medium** — great for the loop; you hand-build state + the pause-for-pick step | Yes (contrast) |
+| **Raw loop** | Hand-rolled tool-calling state machine | **Medium** — fine for the loop; you hand-build state persistence + the pause-for-pick | Yes (contrast) |
+| **Naive baseline** | No re-timing, no choice-set design | **N/A** — built to lose, on purpose | Yes (strawman) |
 | **CrewAI** | Role-based multi-agent crew | **Weak** — one agent doing predict/curate/recover; no real roles to assign | No — evaluation only |
 | **AutoGen** | Conversational multi-agent | **Weak** — conversation-centric, not event-centric; a forced fit | No — evaluation only |
 
@@ -29,10 +30,56 @@ interview insight:
   agent is not in a conversation — it is reacting to external events (flight
   webhook, ride-started, order-rejected) on a timeline it does not control.
 
-## What the LangGraph vs Raw comparison should surface
+## LangGraph vs raw vs naive — the numbers
 
-TODO — fill in after both adapters are built:
-- What LangGraph gave for free (checkpointing, interrupts, the state machine).
-- What it cost (dependency weight, the mental model, debugging the graph).
-- Where the raw loop was simpler, and where it quietly re-implemented LangGraph
-  badly.
+All three implement the same `ArrivalAgent` contract. Reproduce with
+`arrival-agent --compare --scenario delayed-flight` (live; LangGraph + raw each
+make one real LLM call):
+
+| Adapter | LOC | Tool calls | LLM calls | Tokens | Runtime (s) | Ordered (restaurant @ delivery) |
+|---------|-----|-----------|-----------|--------|-------------|---------------------------------|
+| LangGraph | 344 | 6 | 1 | 1994 | 14.1 | Super Duper Burgers @ 01:12 |
+| raw       | 182 | 6 | 1 | 1994 | 12.6 | Super Duper Burgers @ 01:12 |
+| naive     | 53  | 3 | 0 | 0    | 1.95 | Ippudo @ 00:32 |
+
+Two things the table proves, and one it sets up:
+
+**LangGraph and raw place the identical order.** Same restaurant, same delivery
+time, same tool + token cost. They are the same agent — the conformance test
+(`tests/test_adapter_contract.py`) asserts they surface the same choice set and
+place the same option on every run. The orchestration differs; the behavior does
+not.
+
+**The framework was not fewer lines — it was ~2x MORE (344 vs 182).** This is the
+honest, slightly counter-intuitive finding. The win isn't brevity. What LangGraph
+bought, the raw adapter had to hand-roll or do without:
+
+- *Checkpointed state.* LangGraph's `MemorySaver` carries the accumulated events
+  and the prediction across invocations on a thread, and would survive a process
+  restart with a real checkpointer (SQLite/Postgres). The raw adapter holds state
+  in instance attributes (`self._events`, `self._await`) — equivalent in one
+  process, gone on restart. For a trip that spans hours, that durability is the
+  point of the framework.
+- *A real interrupt.* "Surface the choice set, wait for the pick" is a native
+  LangGraph `interrupt()` — pause, persist, resume on `Command(resume=...)`. The
+  raw adapter fakes it with an `_await` flag and a branch at the top of
+  `handle_event` that re-routes events while parked. It works, but it's the kind
+  of state machine you re-implement (slightly worse) every time.
+- *Replay-safety as a constraint.* Because the checkpointer re-runs nodes on
+  resume, the LangGraph adapter must keep the LLM call in its own node and
+  serialize state to JSON-able dicts — extra lines the raw adapter skips by
+  holding native objects. So some of LangGraph's LOC is the tax of correctness
+  under replay, which the raw loop simply doesn't have to pay (and would get
+  subtly wrong at scale).
+
+Verdict: for a one-shot, single-process demo the raw loop is genuinely simpler
+and lighter. The moment you want durable multi-hour state, crash recovery, or a
+visualizable graph, LangGraph earns its extra lines. Choosing it here is choosing
+the trajectory, not the line count.
+
+**The naive baseline shows the cost of no judgment.** It skips re-timing and
+choice-set design entirely: 0 LLM calls, and it orders the moment the ride starts
+— delivering food at **00:32, roughly 40 minutes before the rider reaches the
+room** (~01:12 in this run). One nearest option, no axis, no recovery. That gap
+between `00:32` and `01:12` is the whole product in one cell: knowing *when* to
+act, and designing a choice worth making, is the agent.
