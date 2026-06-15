@@ -1,0 +1,53 @@
+{
+  "axis": "speed_vs_quality",
+  "axis_reason": "At 1 AM after a late flight, the user needs to decide between quick comfort food vs. something more satisfying that's worth the wait.",
+  "why_these": "You're landing exhausted—grab something fast, or treat yourself to a real late-night meal?",
+  "options": [
+    {
+      "option_id": "opt-1",
+      "restaurant_id": "5010936ce4b0abd8740f8fb7",
+      "restaurant_name": "Super Duper Burgers",
+      "items": [
+        "Super Duper Burger",
+        "Fries"
+      ],
+      "est_total": 16.0,
+      "est_delivery_at": null,
+      "cuisine_tags": [
+        "Burger Joint"
+      ],
+      "why_this_one": "Fast, familiar burger—fuel and done in 20 minutes"
+    },
+    {
+      "option_id": "opt-2",
+      "restaurant_id": "4a5f8994f964a520d5bf1fe3",
+      "restaurant_name": "Tropisueño",
+      "items": [
+        "Carnitas Tacos",
+        "Chips & Guac"
+      ],
+      "est_total": 24.0,
+      "est_delivery_at": null,
+      "cuisine_tags": [
+        "Mexican Restaurant"
+      ],
+      "why_this_one": "Solid sit-down Mexican—real plates, takes a bit longer"
+    },
+    {
+      "option_id": "opt-3",
+      "restaurant_id": "5a2737c10457b734e89d1e29",
+      "restaurant_name": "Ippudo",
+      "items": [
+        "Tonkotsu Ramen"
+      ],
+      "est_total": 19.0,
+      "est_delivery_at": null,
+      "cuisine_tags": [
+        "Ramen Restaurant",
+        "Noodle Restaurant",
+        "Japanese Restaurant"
+      ],
+      "why_this_one": "Rich, warming ramen—closest option and worth the 30-min commitment"
+    }
+  ]
+}

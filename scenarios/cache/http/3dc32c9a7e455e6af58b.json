@@ -1,0 +1,46 @@
+{
+  "code": "Ok",
+  "waypoints": [
+    {
+      "location": [
+        -122.401106,
+        37.71257
+      ],
+      "name": "Bayshore Boulevard",
+      "distance": 0.031
+    },
+    {
+      "location": [
+        -122.419986,
+        37.779158
+      ],
+      "name": "US 101 North",
+      "distance": 55.901
+    }
+  ],
+  "routes": [
+    {
+      "distance": 8961.459,
+      "duration": 905.084,
+      "weight": 930.371,
+      "weight_name": "auto",
+      "legs": [
+        {
+          "steps": [],
+          "summary": "Bayshore Boulevard, US 101 North",
+          "distance": 8961.459,
+          "duration": 905.084,
+          "weight": 930.371,
+          "admins": [
+            {
+              "iso_3166_1": "US",
+              "iso_3166_1_alpha3": "USA"
+            }
+          ],
+          "via_waypoints": []
+        }
+      ]
+    }
+  ],
+  "uuid": "Equu7_pmjgfCorxJaTK9p1nzs1iGpv1NqkTVktoos3FaEVlYAm7bAA=="
+}

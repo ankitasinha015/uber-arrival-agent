@@ -1,0 +1,55 @@
+{
+  "axis": "volume",
+  "axis_reason": "Late night, high fatigue after a flight — the real question is how much food energy they need right now",
+  "why_these": "You've had a long travel day. How hungry are you really?",
+  "options": [
+    {
+      "option_id": "opt-1",
+      "restaurant_id": "5e82886cc3e6830008549196",
+      "restaurant_name": "Dumpling Home",
+      "items": [
+        "Pork & chive dumplings"
+      ],
+      "est_total": 14.0,
+      "est_delivery_at": null,
+      "cuisine_tags": [
+        "Dumpling Restaurant"
+      ],
+      "why_this_one": "Light, quick, closest option — just enough to take the edge off"
+    },
+    {
+      "option_id": "opt-2",
+      "restaurant_id": "533cc33f498e604ebad95d8c",
+      "restaurant_name": "Souvla",
+      "items": [
+        "Lamb souvlaki pita",
+        "Greek fries"
+      ],
+      "est_total": 22.0,
+      "est_delivery_at": null,
+      "cuisine_tags": [
+        "Souvlaki Shop",
+        "Greek Restaurant"
+      ],
+      "why_this_one": "Solid meal without being heavy — familiar Mediterranean comfort"
+    },
+    {
+      "option_id": "opt-3",
+      "restaurant_id": "3fd66200f964a520b7ed1ee3",
+      "restaurant_name": "Tommy's Joynt",
+      "items": [
+        "Pastrami sandwich",
+        "Mac & cheese",
+        "Beer"
+      ],
+      "est_total": 28.0,
+      "est_delivery_at": null,
+      "cuisine_tags": [
+        "BBQ Joint",
+        "American Restaurant",
+        "Dive Bar"
+      ],
+      "why_this_one": "Full comfort feast — classic SF dive doing hearty portions since 1947"
+    }
+  ]
+}

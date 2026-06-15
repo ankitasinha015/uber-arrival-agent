@@ -1,0 +1,64 @@
+{
+  "type": "FeatureCollection",
+  "query": [
+    "san",
+    "francisco",
+    "ca"
+  ],
+  "features": [
+    {
+      "id": "place.292358380",
+      "type": "Feature",
+      "place_type": [
+        "place"
+      ],
+      "relevance": 1,
+      "properties": {
+        "mapbox_id": "dXJuOm1ieHBsYzpFVzBJN0E",
+        "wikidata": "Q62"
+      },
+      "text": "San Francisco",
+      "place_name": "San Francisco, California, United States",
+      "bbox": [
+        -122.544641,
+        37.601141,
+        -122.30107,
+        37.866508
+      ],
+      "center": [
+        -122.419359,
+        37.779238
+      ],
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.419359,
+          37.779238
+        ]
+      },
+      "context": [
+        {
+          "id": "district.20547308",
+          "mapbox_id": "dXJuOm1ieHBsYzpBVG1HN0E",
+          "wikidata": "Q62",
+          "text": "San Francisco County"
+        },
+        {
+          "id": "region.419052",
+          "mapbox_id": "dXJuOm1ieHBsYzpCbVRz",
+          "wikidata": "Q99",
+          "short_code": "US-CA",
+          "text": "California"
+        },
+        {
+          "id": "country.8940",
+          "mapbox_id": "dXJuOm1ieHBsYzpJdXc",
+          "wikidata": "Q30",
+          "short_code": "us",
+          "text": "United States"
+        }
+      ]
+    }
+  ],
+  "attribution": "NOTICE: © 2026 Mapbox and its suppliers. All rights reserved. Use of this data is subject to the Mapbox Terms of Service (https://www.mapbox.com/about/maps/). This response and the information it contains may not be retained."
+}

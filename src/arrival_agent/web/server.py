@@ -21,7 +21,13 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
+from arrival_agent.core import cache
 from arrival_agent.web import runner
+
+# Activate record/replay before any run. The deployed server sets
+# ARRIVAL_AGENT_CACHE=replay, so it serves from scenarios/cache/ with no live
+# calls and no API keys.
+cache.install()
 
 app = FastAPI(title="Uber Arrival Agent")
 

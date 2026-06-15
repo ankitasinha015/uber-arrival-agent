@@ -26,7 +26,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from arrival_agent.adapters.langgraph.graph import LangGraphArrivalAgent
-from arrival_agent.core import metrics
+from arrival_agent.core import cache, metrics
 from arrival_agent.core.contract import Action, AgentDecision
 from arrival_agent.core.events import EventType, Scenario, TripEvent, load_scenario
 from arrival_agent.core.tools import flight
@@ -83,8 +83,10 @@ class RunRegistry:
             raise FileNotFoundError(scenario_name)
         sc = load_scenario(path)
 
+        # In replay the taste effect is already baked into the cached choice
+        # set, so we skip the taste store entirely (no torch needed on deploy).
         taste = None
-        if sc.itinerary.get("past_picks"):
+        if sc.itinerary.get("past_picks") and cache.mode() != "replay":
             from arrival_agent.core.domain.taste import TasteStore
             taste = TasteStore(in_memory=True)
             taste.seed_from_scenario(sc)

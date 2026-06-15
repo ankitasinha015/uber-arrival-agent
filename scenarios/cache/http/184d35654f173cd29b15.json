@@ -1,0 +1,46 @@
+{
+  "code": "Ok",
+  "waypoints": [
+    {
+      "location": [
+        -122.401106,
+        37.71257
+      ],
+      "name": "Bayshore Boulevard",
+      "distance": 0.031
+    },
+    {
+      "location": [
+        -122.405057,
+        37.787768
+      ],
+      "name": "Geary Street",
+      "distance": 0.345
+    }
+  ],
+  "routes": [
+    {
+      "distance": 9871.287,
+      "duration": 1132.699,
+      "weight": 1082.515,
+      "weight_name": "auto",
+      "legs": [
+        {
+          "steps": [],
+          "summary": "I 280 North, 3rd Street",
+          "distance": 9871.287,
+          "duration": 1132.699,
+          "weight": 1082.515,
+          "admins": [
+            {
+              "iso_3166_1": "US",
+              "iso_3166_1_alpha3": "USA"
+            }
+          ],
+          "via_waypoints": []
+        }
+      ]
+    }
+  ],
+  "uuid": "MY9MpEyEskCP_uTyFrpBL-uaHlawLrmDXlvxKERKoBLrdHZBZ9DkCA=="
+}

@@ -1,0 +1,78 @@
+{
+  "type": "FeatureCollection",
+  "query": [
+    "marriott",
+    "union",
+    "square",
+    "san",
+    "francisco",
+    "ca"
+  ],
+  "features": [
+    {
+      "id": "neighborhood.666979564",
+      "type": "Feature",
+      "place_type": [
+        "neighborhood"
+      ],
+      "relevance": 0.797037,
+      "properties": {
+        "mapbox_id": "dXJuOm1ieHBsYzpKOEZNN0E",
+        "wikidata": "Q527972"
+      },
+      "text": "Union Square",
+      "place_name": "Union Square, San Francisco, California, United States",
+      "bbox": [
+        -122.409325,
+        37.784283,
+        -122.402115,
+        37.789709
+      ],
+      "center": [
+        -122.40506,
+        37.78777
+      ],
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.40506,
+          37.78777
+        ]
+      },
+      "context": [
+        {
+          "id": "postcode.312463084",
+          "mapbox_id": "dXJuOm1ieHBsYzpFcC9PN0E",
+          "text": "94108"
+        },
+        {
+          "id": "place.292358380",
+          "mapbox_id": "dXJuOm1ieHBsYzpFVzBJN0E",
+          "wikidata": "Q62",
+          "text": "San Francisco"
+        },
+        {
+          "id": "district.20547308",
+          "mapbox_id": "dXJuOm1ieHBsYzpBVG1HN0E",
+          "wikidata": "Q62",
+          "text": "San Francisco County"
+        },
+        {
+          "id": "region.419052",
+          "mapbox_id": "dXJuOm1ieHBsYzpCbVRz",
+          "wikidata": "Q99",
+          "short_code": "US-CA",
+          "text": "California"
+        },
+        {
+          "id": "country.8940",
+          "mapbox_id": "dXJuOm1ieHBsYzpJdXc",
+          "wikidata": "Q30",
+          "short_code": "us",
+          "text": "United States"
+        }
+      ]
+    }
+  ],
+  "attribution": "NOTICE: © 2026 Mapbox and its suppliers. All rights reserved. Use of this data is subject to the Mapbox Terms of Service (https://www.mapbox.com/about/maps/). This response and the information it contains may not be retained."
+}

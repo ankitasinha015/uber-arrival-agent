@@ -21,7 +21,7 @@ import sys
 from datetime import timedelta
 from pathlib import Path
 
-from arrival_agent.core import metrics
+from arrival_agent.core import cache, metrics
 from arrival_agent.core.contract import Action, AgentDecision
 from arrival_agent.core.events import EventType, TripEvent, load_scenario
 from arrival_agent.core.tools import flight
@@ -64,12 +64,16 @@ def main() -> None:
         sys.exit(f"scenario not found: {args.scenario}")
     sc = load_scenario(path)
 
+    cache_mode = cache.install()
+    if cache_mode != "off":
+        print(f"cache: {cache_mode}")
+
     if args.adapter != "langgraph":
         sys.exit(f"adapter {args.adapter!r} is not built yet (step 6/8) — use langgraph")
     from arrival_agent.adapters.langgraph.graph import LangGraphArrivalAgent
 
     taste_store = None
-    if not args.no_taste and sc.itinerary.get("past_picks"):
+    if not args.no_taste and sc.itinerary.get("past_picks") and cache_mode != "replay":
         from arrival_agent.core.domain.taste import TasteStore
         taste_store = TasteStore(in_memory=True)
         user = taste_store.seed_from_scenario(sc)

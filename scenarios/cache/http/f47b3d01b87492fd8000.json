@@ -1,0 +1,77 @@
+{
+  "type": "FeatureCollection",
+  "query": [
+    "san",
+    "francisco",
+    "international",
+    "airport"
+  ],
+  "features": [
+    {
+      "id": "address.7972281905022334",
+      "type": "Feature",
+      "place_type": [
+        "address"
+      ],
+      "relevance": 0.703704,
+      "properties": {
+        "accuracy": "street",
+        "mapbox_id": "dXJuOm1ieGFkci1zdHI6MTRiMmUwMTEtYmQ3Ny00YThmLTgxZjEtMDBhMDBlMzA5YWFh"
+      },
+      "text": "Bayshore Boulevard",
+      "place_name": "Bayshore Boulevard, San Francisco, California 94134, United States",
+      "matching_text": "Airport Boulevard",
+      "matching_place_name": "Airport Boulevard, San Francisco, California 94134, United States",
+      "center": [
+        -122.401106,
+        37.71257
+      ],
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.401106,
+          37.71257
+        ]
+      },
+      "context": [
+        {
+          "id": "neighborhood.365808876",
+          "mapbox_id": "dXJuOm1ieHBsYzpGYzNNN0E",
+          "text": "Little Hollywood"
+        },
+        {
+          "id": "postcode.312667884",
+          "mapbox_id": "dXJuOm1ieHBsYzpFcUx1N0E",
+          "text": "94134"
+        },
+        {
+          "id": "place.292358380",
+          "mapbox_id": "dXJuOm1ieHBsYzpFVzBJN0E",
+          "wikidata": "Q62",
+          "text": "San Francisco"
+        },
+        {
+          "id": "district.20547308",
+          "mapbox_id": "dXJuOm1ieHBsYzpBVG1HN0E",
+          "wikidata": "Q62",
+          "text": "San Francisco County"
+        },
+        {
+          "id": "region.419052",
+          "mapbox_id": "dXJuOm1ieHBsYzpCbVRz",
+          "wikidata": "Q99",
+          "short_code": "US-CA",
+          "text": "California"
+        },
+        {
+          "id": "country.8940",
+          "mapbox_id": "dXJuOm1ieHBsYzpJdXc",
+          "wikidata": "Q30",
+          "short_code": "us",
+          "text": "United States"
+        }
+      ]
+    }
+  ],
+  "attribution": "NOTICE: © 2026 Mapbox and its suppliers. All rights reserved. Use of this data is subject to the Mapbox Terms of Service (https://www.mapbox.com/about/maps/). This response and the information it contains may not be retained."
+}
