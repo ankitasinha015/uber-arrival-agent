@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
@@ -23,6 +24,8 @@ from pydantic import BaseModel
 from arrival_agent.web import runner
 
 app = FastAPI(title="Uber Arrival Agent")
+
+_STATIC = Path(__file__).resolve().parent / "static"
 
 
 class RunRequest(BaseModel):
@@ -92,11 +95,4 @@ def submit_pick(run_id: str, req: PickRequest):
 
 @app.get("/", response_class=HTMLResponse)
 def index():
-    # Step 10 replaces this with the real editorial-restrained frontend.
-    return (
-        "<!doctype html><meta charset=utf-8>"
-        "<title>Uber Arrival Agent</title>"
-        "<p style='font-family:system-ui;max-width:40rem;margin:4rem auto'>"
-        "Backend is up. The demo frontend lands in step 10. "
-        "Try <code>GET /api/scenarios</code>.</p>"
-    )
+    return (_STATIC / "index.html").read_text(encoding="utf-8")

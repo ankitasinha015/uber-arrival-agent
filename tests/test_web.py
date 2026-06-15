@@ -150,4 +150,5 @@ def test_index_serves_html():
     client = TestClient(app)
     r = client.get("/")
     assert r.status_code == 200
-    assert "Arrival Agent" in r.text
+    assert "uber-arrival-agent" in r.text
+    assert "scn-list" in r.text  # the scenario picker mount point
