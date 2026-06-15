@@ -40,3 +40,4 @@ scratch/
 # ~/.gstack/projects/uber-arrival-agent/interview-prep.md
 docs/interview-prep.md
 serve_local.py
+.gstack/
