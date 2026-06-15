@@ -18,6 +18,9 @@ dependencies = [
     "numpy>=1.26",
     # Anthropic SDK for the choice-set LLM call (used by core/domain/choice_set.py).
     "anthropic>=0.39",
+    # Web layer: FastAPI app + SSE streaming of agent decisions (src/.../web/).
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
 ]
 
 [project.optional-dependencies]
