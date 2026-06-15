@@ -98,6 +98,74 @@ class AgentDecision(BaseModel):
     placed_option_id: str | None = None
 
 
+# --- V3: the action-list model (trip concierge) -------------------------------
+#
+# A trip MOMENT (departure/delay/arrival) produces an ordered list of TO-DOs.
+# Each to-do is a SERIES of steps with explicit pause points: the agent runs the
+# auto steps itself and stops at a `pause_for` step to wait for the user (a pick
+# or a send). The controller presents the next to-do, runs its series, then
+# re-checks what to do next. The user takes every consequential final call.
+#
+# This generalizes Action.ASK (one yes/no) into "a curated list of to-dos, each
+# a workflow." The ask-beat (commit 1b34ad8) is the seed; this is the engine.
+
+
+class Moment(str, Enum):
+    """A point in the trip where the agent surfaces a to-do list."""
+
+    DEPARTURE = "departure"   # peak season / departure day — shown light
+    DELAY = "delay"           # flight slips — built deep
+    ARRIVAL = "arrival"       # rider lands late — built deep
+
+
+class ActionKind(str, Enum):
+    """The kind of to-do. Each maps to a series-of-steps template."""
+
+    HEADS_UP = "heads_up"          # informational nudge (leave earlier); pause = snooze/ack
+    NOTIFY_HOTEL = "notify_hotel"  # draft a late-arrival note; pause = send
+    DINNER = "dinner"              # find + rank + design options; pause = pick
+
+
+class ActionStep(BaseModel):
+    """One step in a to-do's series. `pause_for` is None for steps the agent runs
+    itself; set to 'pick'/'send'/'snooze' for the steps that wait for the user."""
+
+    name: str
+    pause_for: str | None = None
+
+
+class ActionItem(BaseModel):
+    """One to-do: a kind, a one-line pitch, and the series of steps to fulfill it.
+
+    `status` walks proposed -> running -> awaiting_user -> done (or declined/skipped)
+    as the controller advances it. The agent acts on the auto steps and pauses at
+    the first `pause_for` step for the user's call.
+    """
+
+    action_id: str
+    kind: ActionKind
+    title: str
+    detail: str
+    steps: list[ActionStep] = Field(default_factory=list)
+    status: str = "proposed"  # proposed|running|awaiting_user|done|declined|skipped
+
+    def next_pause(self) -> ActionStep | None:
+        """The first step that waits for the user, if any."""
+        return next((s for s in self.steps if s.pause_for is not None), None)
+
+
+class ActionList(BaseModel):
+    """The ordered to-dos the agent curated for one moment, with its reasoning."""
+
+    moment: Moment
+    reasoning: str
+    items: list[ActionItem] = Field(default_factory=list)
+
+    def next_pending(self) -> ActionItem | None:
+        """The next to-do still waiting to be presented/run."""
+        return next((i for i in self.items if i.status == "proposed"), None)
+
+
 class ArrivalAgent(ABC):
     """Contract implemented by each framework adapter.
 
