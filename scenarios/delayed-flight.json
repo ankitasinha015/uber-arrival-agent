@@ -4,50 +4,70 @@
   "itinerary": {
     "flight_no": "UA482",
     "scheduled_arrival": "2026-05-20T22:55:00-07:00",
-    "airport": "SFO",
+    "airport": "San Francisco International Airport",
     "hotel": "Marriott Union Square, San Francisco, CA"
   },
   "envelope": {
     "after_hour": 22,
     "max_total": 40,
-    "cuisines": ["thai", "indian"],
+    "cuisines": [
+      "thai",
+      "indian"
+    ],
     "no_supply_action": "schedule_breakfast"
   },
   "events": [
     {
       "type": "trip_booked",
       "at": "2026-05-20T15:00:00-07:00",
-      "payload": { "note": "itinerary registered, agent starts watching" }
+      "payload": {
+        "note": "itinerary registered, agent starts watching"
+      }
     },
     {
       "type": "flight_status",
       "at": "2026-05-20T21:30:00-07:00",
-      "payload": { "status": "delayed", "estimated_arrival": "2026-05-20T23:40:00-07:00" }
+      "payload": {
+        "status": "delayed",
+        "estimated_arrival": "2026-05-20T23:40:00-07:00"
+      }
     },
     {
       "type": "flight_status",
       "at": "2026-05-20T23:35:00-07:00",
-      "payload": { "status": "on_ground", "actual_arrival": "2026-05-20T23:35:00-07:00" }
+      "payload": {
+        "status": "on_ground",
+        "actual_arrival": "2026-05-20T23:35:00-07:00"
+      }
     },
     {
       "type": "ride_started",
       "at": "2026-05-21T00:05:00-07:00",
-      "payload": { "note": "tight ETA now available — agent can place the order" }
-    },
-    {
-      "type": "order_rejected",
-      "at": "2026-05-21T00:14:00-07:00",
-      "payload": { "reason": "restaurant offline", "note": "agent recovers to next-best within envelope" }
+      "payload": {
+        "note": "tight ETA now available — agent can place the order"
+      }
     },
     {
       "type": "ride_ended",
       "at": "2026-05-21T00:40:00-07:00",
-      "payload": { "note": "rider at hotel" }
+      "payload": {
+        "note": "rider at hotel"
+      }
+    },
+    {
+      "type": "order_rejected",
+      "at": "2026-05-21T00:45:00-07:00",
+      "payload": {
+        "reason": "restaurant offline",
+        "note": "agent recovers to next-best within envelope"
+      }
     },
     {
       "type": "check_in",
       "at": "2026-05-21T00:52:00-07:00",
-      "payload": { "note": "anchor for the 20-min-after delivery target" }
+      "payload": {
+        "note": "anchor for the 20-min-after delivery target"
+      }
     }
   ]
 }

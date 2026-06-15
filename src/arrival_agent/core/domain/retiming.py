@@ -218,14 +218,22 @@ def decide_timing(
     prep_minutes: int = DEFAULT_PREP_MIN,
     courier_minutes: int = DEFAULT_COURIER_MIN,
     deliver_after_arrival_min: int = DEFAULT_DELIVERY_AFTER_ARRIVAL_MIN,
+    user_response_buffer_min: float = 0.0,
 ) -> TimingDecision:
     """Decide whether to wait or act, with a one-line reason.
 
     Rule:
         ACT when:
           uncertainty(room_arrival) <= cold_food_tolerance
-          AND  now >= place_by - safety_margin
+          AND  now >= place_by - safety_margin - user_response_buffer
         else WAIT.
+
+    `user_response_buffer_min` exists because in the choice-set product the
+    human is on the critical path: the agent surfaces options, the user picks,
+    THEN the order is placed. Surfacing at the last possible second gives the
+    user no time to choose. Adapters pass a buffer (~20 min) so the choice set
+    appears as soon as the estimate is tight; the pure order-timing math
+    (default 0) is unchanged for callers that don't involve a human.
 
     Knowing when NOT to act is the agent's hardest capability. Until the
     estimate is tight enough (typically ride_started), every minute of slack
@@ -256,8 +264,9 @@ def decide_timing(
             place_by=place_by,
         )
 
-    if now < place_by - timedelta(minutes=safety_margin_min):
-        wait_minutes = (place_by - timedelta(minutes=safety_margin_min) - now).total_seconds() / 60
+    act_at = place_by - timedelta(minutes=safety_margin_min + user_response_buffer_min)
+    if now < act_at:
+        wait_minutes = (act_at - now).total_seconds() / 60
         return TimingDecision(
             action="wait",
             reason=(
