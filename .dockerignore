@@ -1,0 +1,26 @@
+# Keep the image small and secret-free.
+.git
+.github
+.venv
+venv
+env
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.ruff_cache
+.mypy_cache
+
+# local-only / never-in-image
+.env
+*.env
+!.env.example
+.taste
+.chroma
+serve_local.py
+scratch
+docs
+tests
+*.log
+
+# the cache IS shipped (scenarios/cache/) — do not ignore scenarios/

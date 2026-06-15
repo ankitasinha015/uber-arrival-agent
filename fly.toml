@@ -1,0 +1,21 @@
+# Fly.io config for the public demo.
+# Scales to zero when idle (min_machines_running = 0 + auto stop/start), so the
+# demo costs nothing to keep running and cold-starts in ~2-3s on first hit.
+app = "uber-arrival-agent"
+primary_region = "sjc"
+
+[build]
+
+[env]
+  ARRIVAL_AGENT_CACHE = "replay"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
