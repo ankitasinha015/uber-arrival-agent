@@ -60,8 +60,8 @@ class HeadsUpHandler:
 def _default_draft(context: dict) -> str:
     when = context.get("arrival_hhmm", "late tonight")
     return (
-        f"Guest arriving around {when} on a delayed flight — "
-        f"please hold the reservation."
+        f"Guest arriving around {when} on a delayed flight. "
+        f"Please hold the reservation."
     )
 
 

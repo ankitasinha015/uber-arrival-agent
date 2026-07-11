@@ -22,7 +22,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from arrival_agent.core import cache
-from arrival_agent.web import runner
+from arrival_agent.web import concierge, runner
 
 # Activate record/replay before any run. The deployed server sets
 # ARRIVAL_AGENT_CACHE=replay, so it serves from scenarios/cache/ with no live
@@ -109,6 +109,59 @@ def submit_pick(run_id: str, req: PickRequest):
     if not ok:
         return JSONResponse({"error": "run not awaiting a pick"}, status_code=409)
     return {"ok": True}
+
+
+# --- V3 concierge (assistant thread) ----------------------------------------
+
+
+class RespondRequest(BaseModel):
+    decision: str
+    option_id: str | None = None
+    restaurant_id: str | None = None
+
+
+@app.post("/api/concierge/run")
+def concierge_run():
+    run = concierge.registry.create()
+    return {"run_id": run.run_id}
+
+
+@app.get("/api/concierge/{run_id}/stream")
+async def concierge_stream(run_id: str):
+    run = concierge.registry.get(run_id)
+    if run is None:
+        return JSONResponse({"error": "unknown run"}, status_code=404)
+
+    async def gen():
+        if run.queue is None:
+            run.queue = asyncio.Queue()
+        if not run.started:
+            run.started = True
+            asyncio.create_task(concierge.drive(run))
+        yield _sse("open", {"run_id": run.run_id})
+        while True:
+            kind, payload = await run.queue.get()
+            if kind is concierge._CLOSE:
+                break
+            yield _sse(kind, payload)
+
+    return StreamingResponse(
+        gen(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.post("/api/concierge/{run_id}/respond")
+def concierge_respond(run_id: str, req: RespondRequest):
+    ok = concierge.registry.submit(run_id, req.model_dump(exclude_none=True))
+    if not ok:
+        return JSONResponse({"error": "run not awaiting a response"}, status_code=409)
+    return {"ok": True}
+
+
+@app.get("/concierge", response_class=HTMLResponse)
+def concierge_index():
+    return (_STATIC / "concierge.html").read_text(encoding="utf-8")
 
 
 @app.get("/", response_class=HTMLResponse)

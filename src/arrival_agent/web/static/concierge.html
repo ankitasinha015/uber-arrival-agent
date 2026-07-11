@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>trip concierge</title>
+<style>
+:root{
+  --bg:#fbfbfb; --surface:#fff; --ink:#1a1a1a; --ink-soft:#6a6a6a; --ink-faint:#9a9a9a;
+  --rule:#ededed; --rule-soft:#e6e6e6; --accent:#0066ff;
+  --sans:'Inter',system-ui,-apple-system,sans-serif; --mono:ui-monospace,'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);font-family:var(--sans);color:var(--ink);
+  display:flex;justify-content:center;padding:24px 12px}
+.phone{width:410px;max-width:100%;border:1px solid var(--rule);border-radius:28px;
+  overflow:hidden;background:var(--surface);display:flex;flex-direction:column;min-height:640px}
+.bar{display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--rule)}
+.avatar{width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+.who{line-height:1.15}
+.who b{font-size:13px} .who span{font-size:10.5px;color:var(--ink-soft);display:block}
+.clock{margin-left:auto;font-size:10px;color:var(--ink-faint);font-family:var(--mono)}
+.thread{padding:16px;display:flex;flex-direction:column;gap:12px;flex:1;overflow-y:auto}
+.bubble{max-width:88%;background:var(--surface);border:1px solid var(--rule);
+  border-radius:14px 14px 14px 4px;padding:11px 13px;font-size:13.5px;line-height:1.45}
+.you{align-self:flex-end;background:var(--accent);color:#fff;font-size:12.5px;
+  padding:8px 13px;border-radius:14px 14px 4px 14px}
+.card{max-width:94%;background:var(--surface);border:1px solid var(--rule);border-radius:14px;padding:12px 13px}
+.card .lead{font-size:13.5px;line-height:1.45;margin-bottom:8px}
+.draft{border-left:2px solid var(--rule-soft);padding:7px 11px;font-size:12px;color:var(--ink-soft);
+  font-style:italic;line-height:1.4;margin:6px 0 10px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{padding:9px 15px;border-radius:9px;font-size:12.5px;font-weight:600;cursor:pointer;
+  border:1px solid var(--rule-soft);background:var(--surface);color:var(--ink)}
+.btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn.ghost{color:var(--ink-soft);font-weight:400}
+.opt{border:1px solid var(--rule-soft);border-radius:12px;padding:11px;margin-top:9px;cursor:pointer;
+  display:block;width:100%;text-align:left;background:var(--surface)}
+.opt:hover{border-color:var(--ink)}
+.opt .top{display:flex;justify-content:space-between;align-items:baseline}
+.opt .name{font-size:14px;font-weight:600}
+.opt .meta{font-size:11.5px;color:var(--ink-soft);font-family:var(--mono)}
+.opt .why{font-size:12px;color:var(--ink-soft);margin-top:2px}
+.axis{font-size:11px;color:var(--ink-faint);text-transform:none;margin:2px 0 2px}
+.offline{margin-top:9px;font-size:11px;color:var(--accent);cursor:pointer;background:none;border:none;padding:0}
+.note{font-size:11px;color:var(--ink-faint);margin-left:auto}
+.done h3{margin:0 0 3px;font-size:15px} .done p{margin:0;font-size:12.5px;color:var(--ink-soft)}
+.hint{text-align:center;font-size:11px;color:var(--ink-faint);padding:8px}
+.foot{display:flex;align-items:center;gap:9px;padding:11px 14px;border-top:1px solid var(--rule)}
+.foot .fake{flex:1;font-size:12.5px;color:var(--ink-faint);padding:9px 13px;
+  border:1px solid var(--rule-soft);border-radius:20px}
+.replay{font-size:11px;color:var(--accent);cursor:pointer;background:none;border:none}
+.dim{opacity:.5;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="bar">
+    <div class="avatar">A</div>
+    <div class="who"><b>Arrival agent</b><span>watching SFO arrival · tonight</span></div>
+    <button class="replay" id="replay" title="watch again">↻ replay</button>
+  </div>
+  <div class="thread" id="thread"></div>
+  <div class="foot"><div class="fake">Ask the agent anything…</div></div>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const thread = $('#thread');
+let runId = null, es = null, awaitingId = null;
+
+function scroll(){ thread.scrollTop = thread.scrollHeight; }
+function el(cls, html){ const d = document.createElement('div'); d.className = cls; if(html!=null) d.innerHTML = html; thread.appendChild(d); scroll(); return d; }
+
+async function respond(actionId, body){
+  if (awaitingId !== actionId) return;
+  awaitingId = null;
+  await fetch(`/api/concierge/${runId}/respond`, {method:'POST',
+    headers:{'content-type':'application/json'}, body: JSON.stringify(body)});
+}
+
+function esc(s){ return (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function renderTodo(d){
+  awaitingId = d.action_id;
+  const p = d.payload || {};
+  if (d.kind === 'send'){
+    const c = el('card');
+    c.innerHTML = `<div class="lead">I drafted a note to the front desk so they hold your room:</div>
+      <div class="draft">"${esc(p.draft)}"</div>
+      <div class="row"><button class="btn primary" data-a="send">Send</button>
+      <button class="btn ghost" data-a="decline">No thanks</button>
+      <span class="note">you approve · nothing sent yet</span></div>`;
+    c.querySelector('[data-a="send"]').onclick = () => { markDone(c); respond(d.action_id, {decision:'send'}); };
+    c.querySelector('[data-a="decline"]').onclick = () => { markDone(c); respond(d.action_id, {decision:'decline'}); };
+  } else if (d.kind === 'pick'){
+    const c = el('card');
+    let h = `<div class="lead">Here are your options, timed to land ~20 min after you're in.</div>`;
+    if (p.why_these) h += `<div class="axis">${esc(p.why_these)}</div>`;
+    c.innerHTML = h;
+    (p.options||[]).forEach((o,i) => {
+      const eta = o.est_delivery_at ? new Date(o.est_delivery_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
+      const b = document.createElement('button'); b.className = 'opt';
+      b.innerHTML = `<div class="top"><span class="name">${esc(o.restaurant_name)}</span>
+        <span class="meta">$${Math.round(o.est_total)}${eta?' · eta '+eta:''}</span></div>
+        <div class="why">${esc(o.why_this_one)}</div>`;
+      b.onclick = () => { markDone(c); respond(d.action_id, {decision:'pick', option_id:o.option_id}); };
+      c.appendChild(b);
+    });
+    const off = document.createElement('button'); off.className = 'offline';
+    off.textContent = 'a restaurant just went offline →';
+    off.onclick = () => { respond(d.action_id, {decision:'order_rejected', restaurant_id:(p.options[0]||{}).restaurant_id}); };
+    c.appendChild(off);
+  } else { // snooze / heads-up
+    const c = el('card');
+    c.innerHTML = `<div class="lead">${esc(p.detail||d.title)}</div>
+      <div class="row"><button class="btn primary" data-a="snooze">Got it</button></div>`;
+    c.querySelector('[data-a="snooze"]').onclick = () => { markDone(c); respond(d.action_id, {decision:'snooze'}); };
+  }
+  scroll();
+}
+function markDone(card){ card.classList.add('dim'); }
+
+const VERB = {send:'Sent the note', pick:'Picked', snooze:'Got it', decline:'No thanks'};
+function start(){
+  thread.innerHTML = '';
+  fetch('/api/concierge/run', {method:'POST'}).then(r=>r.json()).then(r=>{
+    runId = r.run_id;
+    if (es) es.close();
+    es = new EventSource(`/api/concierge/${runId}/stream`);
+    es.addEventListener('agent', e => el('bubble', esc(JSON.parse(e.data).text)));
+    es.addEventListener('todo', e => renderTodo(JSON.parse(e.data)));
+    es.addEventListener('you', e => { const d = JSON.parse(e.data); el('you', VERB[d.decision]||d.decision); });
+    es.addEventListener('done', e => {
+      const o = JSON.parse(e.data).outcomes || [];
+      const placed = o.map(x=>x.outcome).find(v=>v&&v.placed);
+      el('card done').innerHTML = `<div class="done"><h3>All set.</h3>
+        <p>${placed ? 'Dinner ordered at '+esc(placed.placed)+', timed to your arrival. Hotel notified.' : 'Handled what you asked for.'}</p></div>`;
+      es.close();
+    });
+    es.addEventListener('error', e => { try{ el('bubble', 'Something went wrong: '+esc(JSON.parse(e.data).message)); }catch(_){} });
+  });
+}
+$('#replay').onclick = start;
+start();
+</script>
+</body>
+</html>
