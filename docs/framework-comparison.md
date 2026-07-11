@@ -83,3 +83,38 @@ choice-set design entirely: 0 LLM calls, and it orders the moment the ride start
 room** (~01:12 in this run). One nearest option, no axis, no recovery. That gap
 between `00:32` and `01:12` is the whole product in one cell: knowing *when* to
 act, and designing a choice worth making, is the agent.
+
+## V3: the controller is the core, the framework is durability
+
+The trip concierge (V3) pushed the framework question one level cleaner. The whole
+loop — present next to-do, run its series, pause at pick/send, check for next,
+recover — lives in `core/domain/controller.TripController`, which has **zero
+framework imports**. It is pure Python: no LangGraph, no I/O, no framework state.
+
+So *who drives it* is an orchestration choice, not a logic one. `adapters/
+concierge_drivers.py` gives it two drivers and a conformance test
+(`tests/test_concierge_conformance.py`) proves they are equivalent:
+
+| Driver | How it pauses | Behavior |
+|--------|---------------|----------|
+| **raw** | a plain `while` loop calling `start()` / `respond()` | — |
+| **LangGraph** | one node looping on a native `interrupt()`, `MemorySaver` checkpointer | **identical** |
+
+Both produce the *same pause sequence and the same outcomes*, including through a
+recovery (restaurant offline → re-pause → pick the backup). `raw == LangGraph`.
+
+That makes the finding from the arrival-agent comparison sharper, not weaker.
+Because the loop is fully extracted from the framework:
+
+- **The framework does not decide anything.** The agent's judgment (which to-dos,
+  which axis, when to recover) is all in the pure core. Swapping LangGraph for a
+  raw loop changes nothing the user sees.
+- **What LangGraph buys is durable trip-state.** A real checkpointer (SQLite/
+  Postgres) would let the loop resume mid-trip after a process restart — the flight
+  is delayed for hours, the server redeploys, and the agent picks up exactly where
+  it paused. The raw driver holds the controller in memory and loses that on
+  restart, precisely the tradeoff the arrival-agent raw adapter had.
+- **The interview line:** "I extracted the agent loop into pure core, so the
+  framework is a deployment decision about durability, not an architecture decision
+  about behavior. LangGraph and a hand-rolled loop drive it to byte-identical
+  outcomes; I keep LangGraph for the checkpointing a multi-hour trip needs."
