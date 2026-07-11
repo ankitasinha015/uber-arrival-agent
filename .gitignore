@@ -41,3 +41,6 @@ scratch/
 docs/interview-prep.md
 serve_local.py
 .gstack/
+
+# behaviour memory (per-user counts)
+.memory/

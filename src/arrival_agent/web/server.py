@@ -121,8 +121,8 @@ class RespondRequest(BaseModel):
 
 
 @app.post("/api/concierge/run")
-def concierge_run():
-    run = concierge.registry.create()
+def concierge_run(seasoned: bool = False):
+    run = concierge.registry.create(seasoned=seasoned)
     return {"run_id": run.run_id}
 
 

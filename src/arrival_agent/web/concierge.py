@@ -29,6 +29,7 @@ from arrival_agent.core.domain import choice_set as choice_set_mod
 from arrival_agent.core.domain.action_set import curate_actions
 from arrival_agent.core.domain.controller import Done, Pause, TripController
 from arrival_agent.core.domain.handlers import DinnerHandler, NotifyHotelHandler
+from arrival_agent.core.domain.memory import seed_seasoned
 from arrival_agent.core.tools import orders as orders_mod
 from arrival_agent.core.tools import restaurants as restaurants_mod
 from arrival_agent.core.tools.email import send_hotel_note
@@ -87,15 +88,20 @@ def _design(candidates, context):
     return cs
 
 
-def _build_actions() -> ActionList:
-    """The delay moment for the demo: notify hotel, then dinner."""
+def _build_actions(memory=None) -> ActionList:
+    """The delay moment for the demo: notify hotel, then dinner. Behaviour memory
+    (a returning traveler) can drop/reorder — a seasoned traveler who always
+    handles the hotel themselves gets just dinner."""
+    items = [
+        curate_actions(Moment.DELAY).items[0],     # notify_hotel
+        curate_actions(Moment.ARRIVAL).items[0],   # dinner
+    ]
+    if memory is not None:
+        items = list(memory.shape_actions(Moment.DELAY, items))
     return ActionList(
         moment=Moment.DELAY,
         reasoning="a delayed flight puts two things at risk: the room hold and a late-night meal",
-        items=[
-            curate_actions(Moment.DELAY).items[0],     # notify_hotel
-            curate_actions(Moment.ARRIVAL).items[0],   # dinner
-        ],
+        items=items,
     )
 
 
@@ -117,6 +123,7 @@ def _handlers():
 class ConciergeRun:
     run_id: str
     controller: TripController
+    seasoned: bool = False
     queue: asyncio.Queue | None = None
     response: asyncio.Future | None = None
     started: bool = False
@@ -127,14 +134,15 @@ class ConciergeRegistry:
     def __init__(self) -> None:
         self._runs: dict[str, ConciergeRun] = {}
 
-    def create(self) -> ConciergeRun:
+    def create(self, seasoned: bool = False) -> ConciergeRun:
+        memory = seed_seasoned() if seasoned else None
         controller = TripController(
-            _build_actions(), _handlers(),
+            _build_actions(memory), _handlers(),
             context={"arrival_hhmm": "1:15 AM", "city": _HOTEL, "deliver_at": _DELIVER,
                      "time_of_day": f"{_ARRIVAL:%H:%M} (room arrival estimate)",
                      "fatigue": "high late-night arrival after a flight"},
         )
-        run = ConciergeRun(run_id=uuid4().hex[:12], controller=controller)
+        run = ConciergeRun(run_id=uuid4().hex[:12], controller=controller, seasoned=seasoned)
         self._runs[run.run_id] = run
         return run
 
@@ -165,10 +173,17 @@ async def drive(run: ConciergeRun) -> None:
     if run.queue is None:
         run.queue = asyncio.Queue()
     try:
-        await run.queue.put(("agent", {
-            "text": "Your flight slipped 45 min — you'll reach your room around 1:12 AM, "
-                    "and kitchens near Hotel Zephyr close soon. A couple of things worth handling:",
-        }))
+        if run.seasoned:
+            opening = (
+                "Welcome back. Your flight slipped 45 min — you'll reach your room around "
+                "1:12 AM. You usually sort the hotel yourself, so I'll just line up dinner:"
+            )
+        else:
+            opening = (
+                "Your flight slipped 45 min — you'll reach your room around 1:12 AM, "
+                "and kitchens near Hotel Zephyr close soon. A couple of things worth handling:"
+            )
+        await run.queue.put(("agent", {"text": opening}))
         step = await asyncio.to_thread(run.controller.start)
         while isinstance(step, Pause):
             await run.queue.put(("todo", _pause_payload(step)))

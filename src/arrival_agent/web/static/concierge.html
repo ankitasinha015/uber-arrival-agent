@@ -51,6 +51,9 @@ body{margin:0;background:var(--bg);font-family:var(--sans);color:var(--ink);
 .foot .fake{flex:1;font-size:12.5px;color:var(--ink-faint);padding:9px 13px;
   border:1px solid var(--rule-soft);border-radius:20px}
 .replay{font-size:11px;color:var(--accent);cursor:pointer;background:none;border:none}
+.toggle{margin-left:auto;display:flex;border:1px solid var(--rule-soft);border-radius:8px;overflow:hidden}
+.toggle button{font-size:10.5px;padding:5px 10px;border:none;background:var(--surface);color:var(--ink-soft);cursor:pointer}
+.toggle button.on{background:var(--ink);color:#fff}
 .dim{opacity:.5;pointer-events:none}
 </style>
 </head>
@@ -59,7 +62,10 @@ body{margin:0;background:var(--bg);font-family:var(--sans);color:var(--ink);
   <div class="bar">
     <div class="avatar">A</div>
     <div class="who"><b>Arrival agent</b><span>watching SFO arrival · tonight</span></div>
-    <button class="replay" id="replay" title="watch again">↻ replay</button>
+    <div class="toggle" id="toggle">
+      <button data-seasoned="0" class="on">first trip</button>
+      <button data-seasoned="1">5th trip</button>
+    </div>
   </div>
   <div class="thread" id="thread"></div>
   <div class="foot"><div class="fake">Ask the agent anything…</div></div>
@@ -122,9 +128,10 @@ function renderTodo(d){
 function markDone(card){ card.classList.add('dim'); }
 
 const VERB = {send:'Sent the note', pick:'Picked', snooze:'Got it', decline:'No thanks'};
+let seasoned = '0';
 function start(){
   thread.innerHTML = '';
-  fetch('/api/concierge/run', {method:'POST'}).then(r=>r.json()).then(r=>{
+  fetch(`/api/concierge/run?seasoned=${seasoned}`, {method:'POST'}).then(r=>r.json()).then(r=>{
     runId = r.run_id;
     if (es) es.close();
     es = new EventSource(`/api/concierge/${runId}/stream`);
@@ -141,7 +148,14 @@ function start(){
     es.addEventListener('error', e => { try{ el('bubble', 'Something went wrong: '+esc(JSON.parse(e.data).message)); }catch(_){} });
   });
 }
-$('#replay').onclick = start;
+document.querySelectorAll('#toggle button').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('#toggle button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    seasoned = b.dataset.seasoned;
+    start();
+  };
+});
 start();
 </script>
 </body>
