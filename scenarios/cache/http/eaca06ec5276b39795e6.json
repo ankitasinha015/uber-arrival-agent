@@ -1,0 +1,490 @@
+{
+  "results": [
+    {
+      "fsq_place_id": "4c37acef18e72d7fc2ff16f5",
+      "latitude": 38.01604469808015,
+      "longitude": -122.29062862461839,
+      "categories": [
+        {
+          "fsq_category_id": "4bf58dd8d48988d142941735",
+          "name": "Asian Restaurant",
+          "short_name": "Asian",
+          "plural_name": "Asian Restaurants",
+          "icon": {
+            "prefix": "https://ss3.4sqi.net/img/categories_v2/food/asian_",
+            "suffix": ".png"
+          }
+        }
+      ],
+      "date_created": "2010-07-09",
+      "date_refreshed": "2024-07-09",
+      "distance": 390,
+      "email": "restaurant@yahoo.com",
+      "extended_location": {
+        "dma": "San Francisco-Oakland-San Jose",
+        "census_block_id": "060133591051000"
+      },
+      "link": "/places/4c37acef18e72d7fc2ff16f5",
+      "location": {
+        "address": "1991 Railroad Ave",
+        "locality": "Hercules",
+        "region": "CA",
+        "postcode": "94547",
+        "country": "US",
+        "formatted_address": "1991 Railroad Ave, Hercules, CA 94547"
+      },
+      "name": "Sala Restaurant",
+      "placemaker_url": "https://foursquare.com/placemakers/review-place/4c37acef18e72d7fc2ff16f5",
+      "related_places": {},
+      "social_media": {
+        "facebook_id": "142389435800833",
+        "twitter": "ilovesala"
+      },
+      "tel": "(510) 724-4044"
+    },
+    {
+      "fsq_place_id": "4e19236d483b5cfa49d2107b",
+      "latitude": 38.011232698157954,
+      "longitude": -122.29171504791348,
+      "categories": [
+        {
+          "fsq_category_id": "4bf58dd8d48988d1c8941735",
+          "name": "African Restaurant",
+          "short_name": "African",
+          "plural_name": "African Restaurants",
+          "icon": {
+            "prefix": "https://ss3.4sqi.net/img/categories_v2/food/african_",
+            "suffix": ".png"
+          }
+        }
+      ],
+      "date_created": "2011-07-10",
+      "date_refreshed": "2012-08-02",
+      "distance": 564,
+      "extended_location": {
+        "dma": "San Francisco-Oakland-San Jose",
+        "census_block_id": "060133591052030"
+      },
+      "link": "/places/4e19236d483b5cfa49d2107b",
+      "location": {
+        "address": "1112 Williams",
+        "locality": "Hercules",
+        "region": "CA",
+        "postcode": "94547",
+        "country": "US",
+        "formatted_address": "1112 Williams, Hercules, CA 94547"
+      },
+      "name": "Esther's",
+      "placemaker_url": "https://foursquare.com/placemakers/review-place/4e19236d483b5cfa49d2107b",
+      "related_places": {},
+      "social_media": {
+        "twitter": ""
+      }
+    },
+    {
+      "fsq_place_id": "4bda31fac79cc9287a017ee9",
+      "latitude": 38.01012388596456,
+      "longitude": -122.28266332970918,
+      "categories": [
+        {
+          "fsq_category_id": "4bf58dd8d48988d145941735",
+          "name": "Chinese Restaurant",
+          "short_name": "Chinese",
+          "plural_name": "Chinese Restaurants",
+          "icon": {
+            "prefix": "https://ss3.4sqi.net/img/categories_v2/food/asian_",
+            "suffix": ".png"
+          }
+        }
+      ],
+      "date_created": "2010-04-30",
+      "date_refreshed": "2010-05-14",
+      "distance": 592,
+      "extended_location": {
+        "dma": "San Francisco-Oakland-San Jose",
+        "census_block_id": "060133591041003"
+      },
+      "link": "/places/4bda31fac79cc9287a017ee9",
+      "location": {
+        "address": "San Pablo Ave.",
+        "locality": "Pinole",
+        "region": "CA",
+        "postcode": "94564",
+        "country": "US",
+        "formatted_address": "San Pablo Ave., Pinole, CA 94564"
+      },
+      "name": "Emerald Garden",
+      "placemaker_url": "https://foursquare.com/placemakers/review-place/4bda31fac79cc9287a017ee9",
+      "related_places": {},
+      "social_media": {}
+    },
+    {
+      "fsq_place_id": "5ae66d4b4c9be6002c64ffa5",
+      "latitude": 38.014201,
+      "longitude": -122.27688,
+      "categories": [
+        {
+          "fsq_category_id": "4bf58dd8d48988d113941735",
+          "name": "Korean Restaurant",
+          "short_name": "Korean",
+          "plural_name": "Korean Restaurants",
+          "icon": {
+            "prefix": "https://ss3.4sqi.net/img/categories_v2/food/korean_",
+            "suffix": ".png"
+          }
+        }
+      ],
+      "date_created": "2018-04-30",
+      "date_refreshed": "2026-07-01",
+      "distance": 858,
+      "extended_location": {
+        "dma": "San Francisco-Oakland-San Jose",
+        "census_block_id": "060133591052024"
+      },
+      "link": "/places/5ae66d4b4c9be6002c64ffa5",
+      "location": {
+        "address": "1375 Sycamore Ave",
+        "locality": "Hercules",
+        "region": "CA",
+        "postcode": "94547",
+        "country": "US",
+        "formatted_address": "1375 Sycamore Ave, Hercules, CA 94547"
+      },
+      "name": "Jumping Spoon",
+      "placemaker_url": "https://foursquare.com/placemakers/review-place/5ae66d4b4c9be6002c64ffa5",
+      "related_places": {
+        "parent": {
+          "fsq_place_id": "582de0b2aa69755c617a77d6",
+          "categories": [
+            {
+              "fsq_category_id": "4d954b06a243a5684965b473",
+              "name": "Apartment or Condo",
+              "short_name": "Apartment or Condo",
+              "plural_name": "Apartments or Condos",
+              "icon": {
+                "prefix": "https://ss3.4sqi.net/img/categories_v2/building/apartment_",
+                "suffix": ".png"
+              }
+            }
+          ],
+          "name": "Aventine Apartments"
+        }
+      },
+      "social_media": {
+        "twitter": ""
+      },
+      "tel": "(510) 417-2603",
+      "website": "http://jumpingspoon.menu11.com"
+    },
+    {
+      "fsq_place_id": "51d9f44c498e9e4046225659",
+      "latitude": 38.006464275112116,
+      "longitude": -122.28877783683434,
+      "categories": [
+        {
+          "fsq_category_id": "4bf58dd8d48988d1c1941735",
+          "name": "Mexican Restaurant",
+          "short_name": "Mexican",
+          "plural_name": "Mexican Restaurants",
+          "icon": {
+            "prefix": "https://ss3.4sqi.net/img/categories_v2/food/mexican_",
+            "suffix": ".png"
+          }
+        }
+      ],
+      "date_created": "2013-07-07",
+      "date_refreshed": "2023-07-24",
+      "distance": 901,
+      "extended_location": {
+        "dma": "San Francisco-Oakland-San Jose",
+        "census_block_id": "060133591032008"
+      },
+      "link": "/places/51d9f44c498e9e4046225659",
+      "location": {
+        "address": "2511 San Pablo Ave",
+        "locality": "Pinole",
+        "region": "CA",
+        "postcode": "94564",
+        "country": "US",
+        "formatted_address": "2511 San Pablo Ave (Pinole Valley Road), Pinole, CA 94564"
+      },
+      "name": "Mex-Cal",
+      "placemaker_url": "https://foursquare.com/placemakers/review-place/51d9f44c498e9e4046225659",
+      "related_places": {},
+      "social_media": {
+        "twitter": ""
+      },
+      "tel": "(510) 724-9400"
+    },
+    {
+      "fsq_place_id": "72f85771c5cf4d6a1310564e",
+      "latitude": 38.005657581099065,
+      "longitude": -122.29038454190615,
+      "categories": [
+        {
+          "fsq_category_id": "4bf58dd8d48988d14e941735",
+          "name": "American Restaurant",
+          "short_name": "American",
+          "plural_name": "American Restaurants",
+          "icon": {
+            "prefix": "https://ss3.4sqi.net/img/categories_v2/food/default_",
+            "suffix": ".png"
+          }
+        },
+        {
+          "fsq_category_id": "4bf58dd8d48988d1ce941735",
+          "name": "Seafood Restaurant",
+          "short_name": "Seafood",
+          "plural_name": "Seafood Restaurants",
+          "icon": {
+            "prefix": "https://ss3.4sqi.net/img/categories_v2/food/seafood_",
+            "suffix": ".png"
+          }
+        },
+        {
+          "fsq_category_id": "4bf58dd8d48988d1cc941735",
+          "name": "Steakhouse",
+          "short_name": "Steakhouse",
+          "plural_name": "Steakhouses",
+          "icon": {
+            "prefix": "https://ss3.4sqi.net/img/categories_v2/food/steakhouse_",
+            "suffix": ".png"
+          }
+        }
+      ],
+      "date_created": "2012-05-21",
+      "date_refreshed": "2025-03-21",
+      "distance": 1025,
+      "extended_location": {
+        "dma": "San Francisco-Oakland-San Jose",
+        "census_block_id": "060133591033005"
+      },
+      "link": "/places/72f85771c5cf4d6a1310564e",
+      "location": {
+        "address": "2395 San Pablo Ave",
+        "locality": "Pinole",
+        "region": "CA",
+        "postcode": "94564",
+        "po_box": "P.O. Box 28",
+        "country": "US",
+        "formatted_address": "2395 San Pablo Ave, Pinole, CA 94564"
+      },
+      "name": "Tommy's Bar and Grill",
+      "placemaker_url": "https://foursquare.com/placemakers/review-place/72f85771c5cf4d6a1310564e",
+      "related_places": {},
+      "social_media": {},
+      "tel": "(510) 724-6435"
+    },
+    {
+      "fsq_place_id": "4dc2f18b887770a6be0bf93a",
+      "latitude": 38.00571634362641,
+      "longitude": -122.29092880825405,
+      "categories": [
+        {
+          "fsq_category_id": "4bf58dd8d48988d14e941735",
+          "name": "American Restaurant",
+          "short_name": "American",
+          "plural_name": "American Restaurants",
+          "icon": {
+            "prefix": "https://ss3.4sqi.net/img/categories_v2/food/default_",
+            "suffix": ".png"
+          }
+        }
+      ],
+      "date_created": "2011-05-05",
+      "date_refreshed": "2026-07-03",
+      "distance": 1035,
+      "email": "tinascreekside@aol.com",
+      "extended_location": {
+        "dma": "San Francisco-Oakland-San Jose",
+        "census_block_id": "060133591033002"
+      },
+      "link": "/places/4dc2f18b887770a6be0bf93a",
+      "location": {
+        "address": "2300 San Pablo Ave",
+        "locality": "Pinole",
+        "region": "CA",
+        "postcode": "94564",
+        "country": "US",
+        "formatted_address": "2300 San Pablo Ave (at Tennent Ave), Pinole, CA 94564"
+      },
+      "name": "Tina's Place",
+      "placemaker_url": "https://foursquare.com/placemakers/review-place/4dc2f18b887770a6be0bf93a",
+      "related_places": {},
+      "social_media": {
+        "twitter": "tinasplacecafe"
+      },
+      "tel": "(510) 964-7546",
+      "website": "http://tinacholtzclaw.vpweb.com"
+    },
+    {
+      "fsq_place_id": "4a581789f964a52062b71fe3",
+      "latitude": 38.01219591198893,
+      "longitude": -122.27436169007922,
+      "categories": [
+        {
+          "fsq_category_id": "4bf58dd8d48988d1df931735",
+          "name": "BBQ Joint",
+          "short_name": "BBQ",
+          "plural_name": "BBQ Joints",
+          "icon": {
+            "prefix": "https://ss3.4sqi.net/img/categories_v2/food/bbqalt_",
+            "suffix": ".png"
+          }
+        }
+      ],
+      "chains": [
+        {
+          "fsq_chain_id": "556f3f96bd6a007c77382113",
+          "name": "Kinder's Meats Deli BBQ & Catering"
+        }
+      ],
+      "date_created": "2009-07-11",
+      "date_refreshed": "2026-07-04",
+      "distance": 1106,
+      "email": "info@kindersmeats.com",
+      "extended_location": {
+        "dma": "San Francisco-Oakland-San Jose",
+        "census_block_id": "060133591041003"
+      },
+      "link": "/places/4a581789f964a52062b71fe3",
+      "location": {
+        "address": "3600 San Pablo Ave",
+        "locality": "Hercules",
+        "region": "CA",
+        "postcode": "94547",
+        "country": "US",
+        "formatted_address": "3600 San Pablo Ave, Hercules, CA 94547"
+      },
+      "name": "Kinder's Meats Deli BBQ",
+      "placemaker_url": "https://foursquare.com/placemakers/review-place/4a581789f964a52062b71fe3",
+      "related_places": {},
+      "social_media": {
+        "facebook_id": "121723724507753"
+      },
+      "tel": "(510) 724-2332",
+      "website": "http://www.kindersmeats.com"
+    },
+    {
+      "fsq_place_id": "29511925dd5b4f9dde05cfb2",
+      "latitude": 38.01217556123992,
+      "longitude": -122.27408208967353,
+      "categories": [
+        {
+          "fsq_category_id": "4bf58dd8d48988d16a941735",
+          "name": "Bakery",
+          "short_name": "Bakery",
+          "plural_name": "Bakeries",
+          "icon": {
+            "prefix": "https://ss3.4sqi.net/img/categories_v2/food/bakery_",
+            "suffix": ".png"
+          }
+        },
+        {
+          "fsq_category_id": "4bf58dd8d48988d1c9941735",
+          "name": "Ice Cream Parlor",
+          "short_name": "Ice Cream",
+          "plural_name": "Ice Cream Parlors",
+          "icon": {
+            "prefix": "https://ss3.4sqi.net/img/categories_v2/food/icecream_",
+            "suffix": ".png"
+          }
+        },
+        {
+          "fsq_category_id": "4d4b7105d754a06374d81259",
+          "name": "Restaurant",
+          "short_name": "Restaurant",
+          "plural_name": "Restaurants",
+          "icon": {
+            "prefix": "https://ss3.4sqi.net/img/categories_v2/food/default_",
+            "suffix": ".png"
+          }
+        }
+      ],
+      "date_created": "2013-08-06",
+      "date_refreshed": "2026-05-08",
+      "distance": 1130,
+      "email": "tutti.hercules@gmail.com",
+      "extended_location": {
+        "dma": "San Francisco-Oakland-San Jose",
+        "census_block_id": "060133591041003"
+      },
+      "link": "/places/29511925dd5b4f9dde05cfb2",
+      "location": {
+        "address": "3700 San Pablo Ave",
+        "locality": "Hercules",
+        "region": "CA",
+        "postcode": "94547",
+        "country": "US",
+        "formatted_address": "3700 San Pablo Ave, Hercules, CA 94547"
+      },
+      "name": "Tutti Frutti Hercules",
+      "placemaker_url": "https://foursquare.com/placemakers/review-place/29511925dd5b4f9dde05cfb2",
+      "related_places": {},
+      "social_media": {
+        "facebook_id": "346812235420115"
+      },
+      "tel": "(510) 741-0608",
+      "website": "http://www.tfyogurt.com"
+    },
+    {
+      "fsq_place_id": "4f322bf319836c91c7bd37ec",
+      "latitude": 38.01745314301201,
+      "longitude": -122.27374078193549,
+      "categories": [
+        {
+          "fsq_category_id": "4bf58dd8d48988d16e941735",
+          "name": "Fast Food Restaurant",
+          "short_name": "Fast Food",
+          "plural_name": "Fast Food Restaurants",
+          "icon": {
+            "prefix": "https://ss3.4sqi.net/img/categories_v2/food/fastfood_",
+            "suffix": ".png"
+          }
+        }
+      ],
+      "chains": [
+        {
+          "fsq_chain_id": "556f7a12bd6a75a9903bddb2",
+          "name": "McDonald's"
+        }
+      ],
+      "date_created": "2012-02-08",
+      "date_refreshed": "2026-05-21",
+      "distance": 1182,
+      "extended_location": {
+        "dma": "San Francisco-Oakland-San Jose",
+        "census_block_id": "060133923001011"
+      },
+      "link": "/places/4f322bf319836c91c7bd37ec",
+      "location": {
+        "address": "500 Alfred Nobel Dr",
+        "locality": "Hercules",
+        "region": "CA",
+        "postcode": "94547",
+        "country": "US",
+        "formatted_address": "500 Alfred Nobel Dr (at John Muir Pkwy), Hercules, CA 94547"
+      },
+      "name": "McDonald's",
+      "placemaker_url": "https://foursquare.com/placemakers/review-place/4f322bf319836c91c7bd37ec",
+      "related_places": {},
+      "social_media": {
+        "instagram": "mcdonalds",
+        "twitter": "mcdonalds"
+      },
+      "tel": "(510) 724-2202",
+      "website": "http://mcdonalds.com/"
+    }
+  ],
+  "context": {
+    "geo_bounds": {
+      "circle": {
+        "center": {
+          "latitude": 38.014409,
+          "longitude": -122.286681
+        },
+        "radius": 4000
+      }
+    }
+  }
+}

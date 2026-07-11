@@ -64,8 +64,15 @@ def _design(candidates, context):
     """Design the choice set. Try the LLM (cache-backed in replay); fall back to
     a deterministic set so the demo always renders."""
     deliver = context.get("deliver_at", _DELIVER)
+    # Clean, JSON-serializable context for the LLM/cache layer (a datetime in the
+    # key would break record/replay matching). deliver_at is stamped separately.
+    llm_context = {
+        "time_of_day": context.get("time_of_day", f"{_ARRIVAL:%H:%M} (room arrival estimate)"),
+        "city": context.get("city", _HOTEL),
+        "fatigue": context.get("fatigue", "high late-night arrival after a flight"),
+    }
     try:
-        cs = choice_set_mod.design_choice_set(candidates[:8], context)
+        cs = choice_set_mod.design_choice_set(candidates[:8], llm_context)
         options, axis, why = cs.options, cs.axis, cs.why_these
     except Exception:
         options = [

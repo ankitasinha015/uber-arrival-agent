@@ -18,6 +18,34 @@ cards change — a dead option is dropped and a backup backfilled).*
 
 ---
 
+## Trip Concierge (V3)
+
+The arrival agent above grew into a **trip concierge**: one agent watches the whole
+trip and, at each moment that matters, hands you a curated **one-tap action list** —
+and you approve every consequential step. It never acts on its own, and it gets
+sharper about you each trip.
+
+Open **`/concierge`** for the assistant-thread demo:
+
+```
+departure  → "security lines are heavy — leave earlier"          (tap: got it)
+delay      → "notify the hotel you'll arrive late"     (drafted; tap: send)
+arrival    → "dinner near your hotel, timed to your room"  (2-3 options; tap: pick)
+```
+
+Each to-do is a *series of steps* the agent runs itself, pausing only at your pick
+or send. After each one it **re-checks what's next** — so recovery (a restaurant goes
+offline → surface a backup in-thread) is just the next action, not a special case.
+**Behaviour memory** makes a returning traveler's list shorter and sharper (it drops
+what you always dismiss) — toggle *first trip / 5th trip* to watch it. The dinner
+options and their axis come from one LLM call; the loop itself is a pure,
+framework-agnostic controller (`core/domain/controller.py`) any adapter can drive.
+
+The original single-moment arrival agent (below) is now just the *arrival* moment of
+this concierge, and still runs at `/`.
+
+---
+
 ## Why it's an agent, not a notification
 
 A notification says *"you might be hungry."* This shows up with a resolved, timed,

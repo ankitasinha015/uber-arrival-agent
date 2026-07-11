@@ -1,0 +1,70 @@
+{
+  "type": "FeatureCollection",
+  "query": [
+    "hotel",
+    "zephyr",
+    "san",
+    "francisco"
+  ],
+  "features": [
+    {
+      "id": "address.4563042147123542",
+      "type": "Feature",
+      "place_type": [
+        "address"
+      ],
+      "relevance": 0.5,
+      "properties": {
+        "accuracy": "street",
+        "mapbox_id": "dXJuOm1ieGFkci1zdHI6NTJhYWNlYWEtMjJkMy00MzhmLWI4ZTMtNjNiY2JmY2VjNmNi"
+      },
+      "text": "Zephyr",
+      "place_name": "Zephyr, Hercules, California 94547, United States",
+      "center": [
+        -122.286681,
+        38.014409
+      ],
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.286681,
+          38.014409
+        ]
+      },
+      "context": [
+        {
+          "id": "postcode.313773804",
+          "mapbox_id": "dXJuOm1ieHBsYzpFclBPN0E",
+          "text": "94547"
+        },
+        {
+          "id": "place.146786540",
+          "mapbox_id": "dXJuOm1ieHBsYzpDTC9JN0E",
+          "wikidata": "Q948140",
+          "text": "Hercules"
+        },
+        {
+          "id": "district.5129964",
+          "mapbox_id": "dXJuOm1ieHBsYzpUa2Jz",
+          "wikidata": "Q108058",
+          "text": "Contra Costa County"
+        },
+        {
+          "id": "region.419052",
+          "mapbox_id": "dXJuOm1ieHBsYzpCbVRz",
+          "wikidata": "Q99",
+          "short_code": "US-CA",
+          "text": "California"
+        },
+        {
+          "id": "country.8940",
+          "mapbox_id": "dXJuOm1ieHBsYzpJdXc",
+          "wikidata": "Q30",
+          "short_code": "us",
+          "text": "United States"
+        }
+      ]
+    }
+  ],
+  "attribution": "NOTICE: © 2026 Mapbox and its suppliers. All rights reserved. Use of this data is subject to the Mapbox Terms of Service (https://www.mapbox.com/about/maps/). This response and the information it contains may not be retained."
+}

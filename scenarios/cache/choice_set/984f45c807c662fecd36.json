@@ -1,0 +1,53 @@
+{
+  "axis": "speed_vs_quality",
+  "axis_reason": "At 1am after a long flight, the key decision is whether to grab something quick and close vs. something more substantial that's worth the wait",
+  "why_these": "You've had a long travel day — choose how substantial you want dinner to be",
+  "options": [
+    {
+      "option_id": "opt-1",
+      "restaurant_id": "4c37acef18e72d7fc2ff16f5",
+      "restaurant_name": "Sala Restaurant",
+      "items": [
+        "Pad Thai",
+        "Spring Rolls"
+      ],
+      "est_total": 22.0,
+      "est_delivery_at": null,
+      "cuisine_tags": [
+        "Asian Restaurant"
+      ],
+      "why_this_one": "Closest option — Asian comfort food that'll arrive fastest"
+    },
+    {
+      "option_id": "opt-2",
+      "restaurant_id": "51d9f44c498e9e4046225659",
+      "restaurant_name": "Mex-Cal",
+      "items": [
+        "Carne Asada Burrito",
+        "Chips & Guac"
+      ],
+      "est_total": 18.0,
+      "est_delivery_at": null,
+      "cuisine_tags": [
+        "Mexican Restaurant"
+      ],
+      "why_this_one": "Hearty Mexican that hits the spot without breaking the bank"
+    },
+    {
+      "option_id": "opt-3",
+      "restaurant_id": "4dc2f18b887770a6be0bf93a",
+      "restaurant_name": "Tina's Place",
+      "items": [
+        "BBQ Brisket Plate",
+        "Mac & Cheese",
+        "Cornbread"
+      ],
+      "est_total": 28.0,
+      "est_delivery_at": null,
+      "cuisine_tags": [
+        "American Restaurant"
+      ],
+      "why_this_one": "Full comfort feast — slower but worth it if you're truly hungry"
+    }
+  ]
+}
