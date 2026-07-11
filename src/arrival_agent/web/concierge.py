@@ -28,7 +28,7 @@ from arrival_agent.core.contract import (
 from arrival_agent.core.domain import choice_set as choice_set_mod
 from arrival_agent.core.domain.action_set import curate_actions
 from arrival_agent.core.domain.controller import Done, Pause, TripController
-from arrival_agent.core.domain.handlers import DinnerHandler, NotifyHotelHandler
+from arrival_agent.core.domain.handlers import DinnerHandler, HeadsUpHandler, NotifyHotelHandler
 from arrival_agent.core.domain.memory import seed_seasoned
 from arrival_agent.core.tools import orders as orders_mod
 from arrival_agent.core.tools import restaurants as restaurants_mod
@@ -88,10 +88,15 @@ def _design(candidates, context):
     return cs
 
 
-def _build_actions(memory=None) -> ActionList:
-    """The delay moment for the demo: notify hotel, then dinner. Behaviour memory
-    (a returning traveler) can drop/reorder — a seasoned traveler who always
-    handles the hotel themselves gets just dinner."""
+def _departure_actions(memory=None) -> ActionList:
+    """Before the trip: the peak-season security heads-up (shown light)."""
+    return curate_actions(Moment.DEPARTURE, memory=memory)
+
+
+def _delay_actions(memory=None) -> ActionList:
+    """The delay moment: notify hotel, then dinner. Behaviour memory (a returning
+    traveler) can drop/reorder — one who handles the hotel themselves gets just
+    dinner."""
     items = [
         curate_actions(Moment.DELAY).items[0],     # notify_hotel
         curate_actions(Moment.ARRIVAL).items[0],   # dinner
@@ -105,8 +110,29 @@ def _build_actions(memory=None) -> ActionList:
     )
 
 
+_DEP_INTRO = ("Before you head out — it's peak travel season and security lines are "
+              "heavy today. One thing worth doing now:")
+_DELAY_INTRO_NEW = ("Hours later, at the gate — your flight just slipped 45 min. You'll reach "
+                    "your room around 1:12 AM, and kitchens near Hotel Zephyr close soon. "
+                    "A couple of things worth handling:")
+_DELAY_INTRO_SEASONED = ("Welcome back. Your flight slipped 45 min — you'll reach your room around "
+                         "1:12 AM. You usually sort the hotel yourself, so I'll just line up dinner:")
+
+
+def _segments(memory, seasoned: bool) -> list:
+    """The trip as a sequence of (intro, ActionList) moments — one engine, many
+    moments. Segments whose list is empty (all dropped by memory) are skipped."""
+    segs = []
+    dep = _departure_actions(memory)
+    if dep.items:
+        segs.append((_DEP_INTRO, dep))
+    segs.append(((_DELAY_INTRO_SEASONED if seasoned else _DELAY_INTRO_NEW), _delay_actions(memory)))
+    return segs
+
+
 def _handlers():
     return {
+        ActionKind.HEADS_UP: HeadsUpHandler(),
         ActionKind.NOTIFY_HOTEL: NotifyHotelHandler(
             send=lambda note: send_hotel_note(_HOTEL, note),
         ),
@@ -119,10 +145,16 @@ def _handlers():
     }
 
 
+def _context() -> dict:
+    return {"arrival_hhmm": "1:15 AM", "city": _HOTEL, "deliver_at": _DELIVER,
+            "time_of_day": f"{_ARRIVAL:%H:%M} (room arrival estimate)",
+            "fatigue": "high late-night arrival after a flight"}
+
+
 @dataclass
 class ConciergeRun:
     run_id: str
-    controller: TripController
+    segments: list  # [(intro_text, ActionList)] — the trip's moments in order
     seasoned: bool = False
     queue: asyncio.Queue | None = None
     response: asyncio.Future | None = None
@@ -136,13 +168,9 @@ class ConciergeRegistry:
 
     def create(self, seasoned: bool = False) -> ConciergeRun:
         memory = seed_seasoned() if seasoned else None
-        controller = TripController(
-            _build_actions(memory), _handlers(),
-            context={"arrival_hhmm": "1:15 AM", "city": _HOTEL, "deliver_at": _DELIVER,
-                     "time_of_day": f"{_ARRIVAL:%H:%M} (room arrival estimate)",
-                     "fatigue": "high late-night arrival after a flight"},
+        run = ConciergeRun(
+            run_id=uuid4().hex[:12], segments=_segments(memory, seasoned), seasoned=seasoned
         )
-        run = ConciergeRun(run_id=uuid4().hex[:12], controller=controller, seasoned=seasoned)
         self._runs[run.run_id] = run
         return run
 
@@ -168,32 +196,29 @@ def _pause_payload(step: Pause) -> dict:
 
 
 async def drive(run: ConciergeRun) -> None:
-    """Run the controller, streaming each agent turn and pause to the browser."""
+    """Walk the trip's moments in order. Each moment gets its own controller — one
+    engine, many moments — streaming agent turns and pauses to the browser."""
     loop = asyncio.get_running_loop()
     if run.queue is None:
         run.queue = asyncio.Queue()
+    outcomes: list[dict] = []
     try:
-        if run.seasoned:
-            opening = (
-                "Welcome back. Your flight slipped 45 min — you'll reach your room around "
-                "1:12 AM. You usually sort the hotel yourself, so I'll just line up dinner:"
-            )
-        else:
-            opening = (
-                "Your flight slipped 45 min — you'll reach your room around 1:12 AM, "
-                "and kitchens near Hotel Zephyr close soon. A couple of things worth handling:"
-            )
-        await run.queue.put(("agent", {"text": opening}))
-        step = await asyncio.to_thread(run.controller.start)
-        while isinstance(step, Pause):
-            await run.queue.put(("todo", _pause_payload(step)))
-            run.response = loop.create_future()
-            run.awaiting = True
-            user_input = await run.response
-            run.awaiting = False
-            await run.queue.put(("you", {"action_id": step.action_id, "decision": user_input.get("decision")}))
-            step = await asyncio.to_thread(run.controller.respond, user_input)
-        await run.queue.put(("done", {"outcomes": step.outcomes}))
+        for intro, actions in run.segments:
+            await run.queue.put(("agent", {"text": intro}))
+            controller = TripController(actions, _handlers(), _context())
+            step = await asyncio.to_thread(controller.start)
+            while isinstance(step, Pause):
+                await run.queue.put(("todo", _pause_payload(step)))
+                run.response = loop.create_future()
+                run.awaiting = True
+                user_input = await run.response
+                run.awaiting = False
+                await run.queue.put(("you", {
+                    "action_id": step.action_id, "decision": user_input.get("decision"),
+                }))
+                step = await asyncio.to_thread(controller.respond, user_input)
+            outcomes.extend(step.outcomes)  # step is Done for this moment
+        await run.queue.put(("done", {"outcomes": outcomes}))
     except Exception as e:  # never hang the stream
         await run.queue.put(("error", {"message": f"{type(e).__name__}: {e}"}))
     finally:

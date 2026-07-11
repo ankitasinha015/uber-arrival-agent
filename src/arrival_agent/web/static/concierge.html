@@ -139,10 +139,14 @@ function start(){
     es.addEventListener('todo', e => renderTodo(JSON.parse(e.data)));
     es.addEventListener('you', e => { const d = JSON.parse(e.data); el('you', VERB[d.decision]||d.decision); });
     es.addEventListener('done', e => {
-      const o = JSON.parse(e.data).outcomes || [];
-      const placed = o.map(x=>x.outcome).find(v=>v&&v.placed);
+      const o = (JSON.parse(e.data).outcomes || []).map(x=>x.outcome);
+      const placed = o.find(v=>v&&v.placed);
+      const sent = o.some(v=>v&&v.sent);
+      const parts = [];
+      if (placed) parts.push('Dinner ordered at '+esc(placed.placed)+', timed to your arrival');
+      if (sent) parts.push('hotel notified');
       el('card done').innerHTML = `<div class="done"><h3>All set.</h3>
-        <p>${placed ? 'Dinner ordered at '+esc(placed.placed)+', timed to your arrival. Hotel notified.' : 'Handled what you asked for.'}</p></div>`;
+        <p>${parts.length ? parts.join(' · ')+'.' : 'Handled what you asked for.'}</p></div>`;
       es.close();
     });
     es.addEventListener('error', e => { try{ el('bubble', 'Something went wrong: '+esc(JSON.parse(e.data).message)); }catch(_){} });

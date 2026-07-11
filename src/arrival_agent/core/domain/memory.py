@@ -106,6 +106,7 @@ def seed_seasoned(user_id: str = "seasoned") -> ActionMemory:
     sharper list. In-memory, for the demo/tests."""
     m = ActionMemory(user_id, in_memory=True)
     for _ in range(3):
-        m.record(Moment.DELAY, ActionKind.NOTIFY_HOTEL, "decline")
-        m.record(Moment.ARRIVAL, ActionKind.DINNER, "pick")
+        m.record(Moment.DEPARTURE, ActionKind.HEADS_UP, "snooze")   # always snoozes the nudge
+        m.record(Moment.DELAY, ActionKind.NOTIFY_HOTEL, "decline")  # handles the hotel themselves
+        m.record(Moment.ARRIVAL, ActionKind.DINNER, "pick")         # always orders dinner
     return m
