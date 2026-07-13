@@ -115,14 +115,23 @@ _SMOOTH_INTRO = ("You're arriving early tonight (~9:40 PM) — everything's on t
 
 
 def _departure_segment(sig, memory):
-    """Fires only if the dial says so (long-enough line, in the window, fresh)."""
+    """Fires only if the dial says so (long-enough line, in the window, fresh).
+    The message is driven by the actual wait, not generic copy."""
     level = assess(Moment.DEPARTURE, sig)
     if level == Intensity.NONE:
         return None
     al = curate_actions(Moment.DEPARTURE, signals=sig, memory=memory)
     if not al.items:
         return None
-    return ((_DEP_INTRO_HIGH if level == Intensity.HIGH else _DEP_INTRO_LOW), al)
+    wait = sig.get("security_wait_min")
+    lead = 45 if level == Intensity.HIGH else 30   # urgent line → leave even earlier
+    for it in al.items:
+        if it.kind == ActionKind.HEADS_UP:
+            it.title = f"Leave ~{lead} min earlier"
+            it.detail = (f"Security's running about {wait} min right now — "
+                         f"give yourself an extra {lead} minutes to make the gate.")
+    intro = _DEP_INTRO_HIGH if level == Intensity.HIGH else _DEP_INTRO_LOW
+    return (intro, al)
 
 
 def _arrival_segment(sig, memory, mode):
