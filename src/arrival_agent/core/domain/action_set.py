@@ -108,12 +108,24 @@ def curate_actions(
     moment: Moment,
     context: dict | None = None,
     *,
+    signals: dict | None = None,
     memory: ActionMemory | None = None,
 ) -> ActionList:
-    """Curate the ordered to-dos for `moment`. `memory`, if given, reshapes the
-    list (drop dismissed, float favoured). Returns an ActionList the controller
-    walks one item at a time."""
+    """Curate the ordered to-dos for `moment`. `signals`, if given, drives the
+    intensity dial (how forcefully to respond); `memory` reshapes the list.
+    Without signals the dial defaults to HIGH, so existing callers are unchanged.
+    """
+    from arrival_agent.core.domain.intensity import Intensity, assess, read
+
+    level = assess(moment, signals) if signals is not None else Intensity.HIGH
+    the_read = read(moment, signals) if signals is not None else ""
+
     items = [build() for build in _TEMPLATES.get(moment, [])]
+    if level == Intensity.NONE:
+        items = []
     if memory is not None:
         items = list(memory.shape_actions(moment, items))
-    return ActionList(moment=moment, reasoning=_reasoning(moment, items), items=items)
+    return ActionList(
+        moment=moment, reasoning=_reasoning(moment, items), items=items,
+        intensity=level.value, read=the_read,
+    )

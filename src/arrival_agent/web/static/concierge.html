@@ -55,6 +55,8 @@ body{margin:0;background:var(--bg);font-family:var(--sans);color:var(--ink);
 .toggle button{font-size:10.5px;padding:5px 10px;border:none;background:var(--surface);color:var(--ink-soft);cursor:pointer}
 .toggle button.on{background:var(--ink);color:#fff}
 .dim{opacity:.5;pointer-events:none}
+.read{align-self:center;font-family:var(--mono);font-size:10px;color:var(--ink-faint);
+  background:var(--bg);border:1px dashed var(--rule-soft);border-radius:6px;padding:3px 9px;letter-spacing:.2px}
 </style>
 </head>
 <body>
@@ -63,8 +65,9 @@ body{margin:0;background:var(--bg);font-family:var(--sans);color:var(--ink);
     <div class="avatar">A</div>
     <div class="who"><b>Arrival agent</b><span>watching SFO arrival · tonight</span></div>
     <div class="toggle" id="toggle">
-      <button data-seasoned="0" class="on">first trip</button>
-      <button data-seasoned="1">5th trip</button>
+      <button data-mode="new" class="on">delayed</button>
+      <button data-mode="seasoned">5th trip</button>
+      <button data-mode="smooth">smooth</button>
     </div>
   </div>
   <div class="thread" id="thread"></div>
@@ -134,13 +137,14 @@ function renderTodo(d){
 function markDone(card){ card.classList.add('dim'); }
 
 const VERB = {send:'Sent the note', pick:'Picked', snooze:'Got it', decline:'No thanks'};
-let seasoned = '0';
+let mode = 'new';
 function start(){
   thread.innerHTML = '';
-  fetch(`/api/concierge/run?seasoned=${seasoned}`, {method:'POST'}).then(r=>r.json()).then(r=>{
+  fetch(`/api/concierge/run?mode=${mode}`, {method:'POST'}).then(r=>r.json()).then(r=>{
     runId = r.run_id;
     if (es) es.close();
     es = new EventSource(`/api/concierge/${runId}/stream`);
+    es.addEventListener('read', e => { const d = JSON.parse(e.data); el('read', 'agent read · ' + esc(d.text)); });
     es.addEventListener('agent', e => el('bubble', esc(JSON.parse(e.data).text)));
     es.addEventListener('todo', e => renderTodo(JSON.parse(e.data)));
     es.addEventListener('you', e => { const d = JSON.parse(e.data); el('you', esc(d.text || VERB[d.decision] || d.decision)); });
@@ -172,7 +176,7 @@ document.querySelectorAll('#toggle button').forEach(b => {
   b.onclick = () => {
     document.querySelectorAll('#toggle button').forEach(x => x.classList.remove('on'));
     b.classList.add('on');
-    seasoned = b.dataset.seasoned;
+    mode = b.dataset.mode;
     start();
   };
 });

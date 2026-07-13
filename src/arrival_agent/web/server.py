@@ -125,8 +125,8 @@ class SayRequest(BaseModel):
 
 
 @app.post("/api/concierge/run")
-def concierge_run(seasoned: bool = False):
-    run = concierge.registry.create(seasoned=seasoned)
+def concierge_run(mode: str = "new"):
+    run = concierge.registry.create(mode=mode)
     return {"run_id": run.run_id}
 
 

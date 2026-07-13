@@ -155,11 +155,17 @@ class ActionItem(BaseModel):
 
 
 class ActionList(BaseModel):
-    """The ordered to-dos the agent curated for one moment, with its reasoning."""
+    """The ordered to-dos the agent curated for one moment, with its reasoning.
+
+    `intensity` is the dial (high/low/none) — how forcefully to respond. `read`
+    is a one-line summary of the signals that drove it (shown in the UI so the
+    data flow is visible)."""
 
     moment: Moment
     reasoning: str
     items: list[ActionItem] = Field(default_factory=list)
+    intensity: str = "high"   # high | low | none
+    read: str = ""
 
     def next_pending(self) -> ActionItem | None:
         """The next to-do still waiting to be presented/run."""

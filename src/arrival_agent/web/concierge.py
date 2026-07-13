@@ -29,6 +29,7 @@ from arrival_agent.core.domain import choice_set as choice_set_mod
 from arrival_agent.core.domain.action_set import curate_actions
 from arrival_agent.core.domain.controller import Done, Pause, TripController
 from arrival_agent.core.domain.handlers import DinnerHandler, HeadsUpHandler, NotifyHotelHandler
+from arrival_agent.core.domain.intensity import Intensity, assess, read
 from arrival_agent.core.domain.memory import seed_seasoned
 from arrival_agent.core.tools import orders as orders_mod
 from arrival_agent.core.tools import restaurants as restaurants_mod
@@ -95,45 +96,65 @@ def _design(candidates, context):
     return cs
 
 
-def _departure_actions(memory=None) -> ActionList:
-    """Before the trip: the peak-season security heads-up (shown light)."""
-    return curate_actions(Moment.DEPARTURE, memory=memory)
+# Situation feeds per mode (mocked, real-shaped) — these drive the intensity dial.
+_SIGNALS = {
+    "new":      {"delay_min": 45, "arrival_hour": 1,  "security_wait_min": 45, "pre_flight_min": 120, "security_fresh": True},
+    "seasoned": {"delay_min": 45, "arrival_hour": 1,  "security_wait_min": 45, "pre_flight_min": 120, "security_fresh": True},
+    "smooth":   {"delay_min": 0,  "arrival_hour": 21, "security_wait_min": 8,  "pre_flight_min": 120, "security_fresh": True},
+}
 
-
-def _delay_actions(memory=None) -> ActionList:
-    """The delay moment: notify hotel, then dinner. Behaviour memory (a returning
-    traveler) can drop/reorder — one who handles the hotel themselves gets just
-    dinner."""
-    items = [
-        curate_actions(Moment.DELAY).items[0],     # notify_hotel
-        curate_actions(Moment.ARRIVAL).items[0],   # dinner
-    ]
-    if memory is not None:
-        items = list(memory.shape_actions(Moment.DELAY, items))
-    return ActionList(
-        moment=Moment.DELAY,
-        reasoning="a delayed flight puts two things at risk: the room hold and a late-night meal",
-        items=items,
-    )
-
-
-_DEP_INTRO = ("Before you head out — it's peak travel season and security lines are "
-              "heavy today. One thing worth doing now:")
+_DEP_INTRO_HIGH = "Before you head out — security's running long right now. Leave sooner:"
+_DEP_INTRO_LOW = "Before you head out — one thing worth doing:"
 _DELAY_INTRO_NEW = ("Hours later, at the gate — your flight just slipped 45 min. You'll reach "
                     "your room around 1:12 AM, and kitchens near Hotel Zephyr close soon. "
                     "A couple of things worth handling:")
 _DELAY_INTRO_SEASONED = ("Welcome back. Your flight slipped 45 min — you'll reach your room around "
                          "1:12 AM. You usually sort the hotel yourself, so I'll just line up dinner:")
+_SMOOTH_INTRO = ("You're arriving early tonight (~9:40 PM) — everything's on track: kitchens are "
+                 "open and the security line's clear. One optional thing, then I'll leave you be:")
 
 
-def _segments(memory, seasoned: bool) -> list:
-    """The trip as a sequence of (intro, ActionList) moments — one engine, many
-    moments. Segments whose list is empty (all dropped by memory) are skipped."""
+def _departure_segment(sig, memory):
+    """Fires only if the dial says so (long-enough line, in the window, fresh)."""
+    level = assess(Moment.DEPARTURE, sig)
+    if level == Intensity.NONE:
+        return None
+    al = curate_actions(Moment.DEPARTURE, signals=sig, memory=memory)
+    if not al.items:
+        return None
+    return ((_DEP_INTRO_HIGH if level == Intensity.HIGH else _DEP_INTRO_LOW), al)
+
+
+def _arrival_segment(sig, memory, mode):
+    """HIGH → notify hotel + dinner. LOW (calm) → just the optional hotel offer."""
+    level = assess(Moment.ARRIVAL, sig)
+    items = [
+        curate_actions(Moment.DELAY).items[0],     # notify_hotel
+        curate_actions(Moment.ARRIVAL).items[0],   # dinner
+    ]
+    if level == Intensity.LOW:
+        items = [i for i in items if i.kind == ActionKind.NOTIFY_HOTEL]
+    if memory is not None:
+        items = list(memory.shape_actions(Moment.DELAY, items))
+    intro = _SMOOTH_INTRO if mode == "smooth" else (
+        _DELAY_INTRO_SEASONED if mode == "seasoned" else _DELAY_INTRO_NEW)
+    al = ActionList(
+        moment=Moment.DELAY,
+        reasoning="a delayed flight puts the room hold and a late meal at risk",
+        items=items, intensity=level.value, read=read(Moment.ARRIVAL, sig),
+    )
+    return (intro, al)
+
+
+def _segments(memory, mode: str) -> list:
+    """The trip as a sequence of (intro, ActionList) moments, each sized by the
+    intensity dial. A calm trip yields one light offer; a rough one, the full list."""
+    sig = _SIGNALS.get(mode, _SIGNALS["new"])
     segs = []
-    dep = _departure_actions(memory)
-    if dep.items:
-        segs.append((_DEP_INTRO, dep))
-    segs.append(((_DELAY_INTRO_SEASONED if seasoned else _DELAY_INTRO_NEW), _delay_actions(memory)))
+    dep = _departure_segment(sig, memory)
+    if dep:
+        segs.append(dep)
+    segs.append(_arrival_segment(sig, memory, mode))
     return segs
 
 
@@ -152,8 +173,9 @@ def _handlers():
     }
 
 
-def _context() -> dict:
-    return {"arrival_hhmm": "1:15 AM", "city": _HOTEL, "deliver_at": _DELIVER,
+def _context(mode: str = "new") -> dict:
+    arrival_hhmm = "9:40 PM" if mode == "smooth" else "1:15 AM"
+    return {"arrival_hhmm": arrival_hhmm, "city": _HOTEL, "deliver_at": _DELIVER,
             "time_of_day": f"{_ARRIVAL:%H:%M} (room arrival estimate)",
             "fatigue": "high late-night arrival after a flight"}
 
@@ -191,7 +213,7 @@ def parse_intent(text: str, kind: str) -> dict:
 class ConciergeRun:
     run_id: str
     segments: list  # [(intro_text, ActionList)] — the trip's moments in order
-    seasoned: bool = False
+    mode: str = "new"
     queue: asyncio.Queue | None = None
     response: asyncio.Future | None = None
     started: bool = False
@@ -203,10 +225,12 @@ class ConciergeRegistry:
     def __init__(self) -> None:
         self._runs: dict[str, ConciergeRun] = {}
 
-    def create(self, seasoned: bool = False) -> ConciergeRun:
-        memory = seed_seasoned() if seasoned else None
+    def create(self, mode: str = "new") -> ConciergeRun:
+        if mode not in _SIGNALS:
+            mode = "new"
+        memory = seed_seasoned() if mode == "seasoned" else None
         run = ConciergeRun(
-            run_id=uuid4().hex[:12], segments=_segments(memory, seasoned), seasoned=seasoned
+            run_id=uuid4().hex[:12], segments=_segments(memory, mode), mode=mode
         )
         self._runs[run.run_id] = run
         return run
@@ -249,8 +273,10 @@ async def drive(run: ConciergeRun) -> None:
     outcomes: list[dict] = []
     try:
         for intro, actions in run.segments:
+            if getattr(actions, "read", ""):   # show the signals -> verdict (data flow)
+                await run.queue.put(("read", {"text": actions.read, "intensity": actions.intensity}))
             await run.queue.put(("agent", {"text": intro}))
-            controller = TripController(actions, _handlers(), _context())
+            controller = TripController(actions, _handlers(), _context(run.mode))
             step = await asyncio.to_thread(controller.start)
             while isinstance(step, Pause):
                 await run.queue.put(("todo", _pause_payload(step)))
