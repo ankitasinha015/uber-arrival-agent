@@ -157,6 +157,14 @@ function renderTodo(d){
     off.textContent = 'a restaurant just went offline →';
     off.onclick = () => { respond(d.action_id, {decision:'order_rejected', restaurant_id:(p.options[0]||{}).restaurant_id}); };
     c.appendChild(off);
+  } else if (d.kind === 'confirm_dish'){
+    const c = el('card');
+    c.innerHTML = `<div class="lead">Your usual at ${esc(p.restaurant_name)} is the <b>${esc(p.dish)}</b>.</div>
+      <div class="axis">Order it to your room at ${esc(p.hotel)}?</div>
+      <div class="row"><button class="btn primary" data-a="confirm">Order to my room</button>
+      <button class="btn ghost" data-a="back">Back to options</button></div>`;
+    c.querySelector('[data-a="confirm"]').onclick = () => { markDone(c); respond(d.action_id, {decision:'confirm'}); };
+    c.querySelector('[data-a="back"]').onclick = () => { markDone(c); respond(d.action_id, {decision:'back'}); };
   } else { // snooze / heads-up
     const c = el('card');
     c.innerHTML = `<div class="lead">${esc(p.detail||d.title)}</div>
@@ -167,7 +175,7 @@ function renderTodo(d){
 }
 function markDone(card){ card.classList.add('dim'); }
 
-const VERB = {send:'Sent the note', pick:'Picked', snooze:'Got it', decline:'No thanks'};
+const VERB = {send:'Sent the note', pick:'Picked', confirm:'Order it', back:'Back to options', snooze:'Got it', decline:'No thanks'};
 // scenario is driven by the trip; ?mode=seasoned|smooth still works for demos
 let mode = new URLSearchParams(location.search).get('mode') || 'new';
 function start(){
@@ -186,7 +194,7 @@ function start(){
       const placed = o.find(v=>v&&v.placed);
       const sent = o.some(v=>v&&v.sent);
       const parts = [];
-      if (placed) parts.push('Dinner ordered at '+esc(placed.placed)+', timed to your arrival');
+      if (placed) parts.push((placed.dish ? esc(placed.dish)+' from '+esc(placed.placed) : 'Dinner at '+esc(placed.placed))+', to your room');
       if (sent) parts.push('hotel notified');
       el('card done').innerHTML = `<div class="done"><h3>All set.</h3>
         <p>${parts.length ? parts.join(' · ')+'.' : 'Handled what you asked for.'}</p></div>`;

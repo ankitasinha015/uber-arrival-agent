@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "uvicorn", "arrival_agent.web.server:app", "--port", "8077"],
+      "port": 8077
+    }
+  ]
+}

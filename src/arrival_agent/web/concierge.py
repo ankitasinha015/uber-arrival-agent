@@ -284,6 +284,10 @@ def parse_intent(text: str, kind: str) -> dict:
         return {"decision": "send", "text": text}
     if kind == "snooze" and any(w in t for w in ("got it", "ok", "sure", "thanks")):
         return {"decision": "snooze", "text": text}
+    if kind == "confirm_dish":
+        if any(w in t for w in ("order", "yes", "confirm", "send", "get it", "go ahead", "sure", "please")):
+            return {"decision": "confirm", "text": text}
+        return {"decision": "back", "text": text}
     return {"decision": "refine", "text": text}  # stray text -> handler re-pauses with a hint
 
 

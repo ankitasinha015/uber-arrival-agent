@@ -66,7 +66,9 @@ def test_dinner_pauses_at_pick_then_places():
     assert step.kind == "pick"
     assert 2 <= len(step.payload["options"]) <= 3
 
-    done = c.respond({"decision": "pick", "option_id": step.payload["options"][0]["option_id"]})
+    confirm = c.respond({"decision": "pick", "option_id": step.payload["options"][0]["option_id"]})
+    assert isinstance(confirm, Pause) and confirm.kind == "confirm_dish"   # suggests the usual dish first
+    done = c.respond({"decision": "confirm"})
     assert isinstance(done, Done)
     assert done.outcomes[-1]["outcome"]["placed"] == "Lers Ros"
 
@@ -90,7 +92,8 @@ def test_typed_refinement_reshapes_the_options():
     assert got == sorted(prices)                                   # reordered cheapest-first
     assert "cheapest" in cheaper.payload["note"]
 
-    done = c.respond({"decision": "pick", "option_id": cheaper.payload["options"][0]["option_id"]})
+    c.respond({"decision": "pick", "option_id": cheaper.payload["options"][0]["option_id"]})
+    done = c.respond({"decision": "confirm"})
     assert isinstance(done, Done)
 
 
@@ -105,7 +108,9 @@ def test_offline_restaurant_repauses_with_a_backup():
     assert dropped not in ids                                     # dead option gone
     assert any("Backup" in o["why_this_one"] for o in again.payload["options"])  # backfilled
 
-    done = c.respond({"decision": "pick", "option_id": again.payload["options"][0]["option_id"]})
+    confirm = c.respond({"decision": "pick", "option_id": again.payload["options"][0]["option_id"]})
+    assert isinstance(confirm, Pause) and confirm.kind == "confirm_dish"
+    done = c.respond({"decision": "confirm"})
     assert isinstance(done, Done)
 
 
@@ -157,6 +162,7 @@ def test_loop_advances_to_the_next_todo():
     assert isinstance(step2, Pause) and step2.kind == "pick"   # advanced to dinner
     assert sent["note"]                                # the hotel note actually went
 
-    done = c.respond({"decision": "pick", "option_id": step2.payload["options"][0]["option_id"]})
+    c.respond({"decision": "pick", "option_id": step2.payload["options"][0]["option_id"]})  # -> confirm dish
+    done = c.respond({"decision": "confirm"})
     assert isinstance(done, Done)
     assert len(done.outcomes) == 2                     # both to-dos resolved

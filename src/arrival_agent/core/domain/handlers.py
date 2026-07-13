@@ -118,6 +118,7 @@ class DinnerHandler:
         self._rank = rank
         self._candidates: list = []
         self._options: list[dict] = []
+        self._picked: dict | None = None
 
     def prepare(self, item: ActionItem, context: dict) -> Prepared:
         candidates = self._find(context)
@@ -215,13 +216,29 @@ class DinnerHandler:
                 payload={"options": self._options, "note": note},
             )
 
+        if decision == "back":                       # back to the restaurant list
+            self._picked = None
+            return Resolved(done=False, repause="pick", payload={"options": self._options})
+
+        if decision == "confirm":                    # confirm the dish -> order to the room
+            picked = self._picked or (self._options[0] if self._options else None)
+            if picked is None:
+                return Resolved(done=False, repause="pick", payload={"options": self._options})
+            dish = (picked.get("items") or ["order"])[0]
+            order = self._place(picked)
+            return Resolved(done=True, outcome={
+                "placed": picked["restaurant_name"], "dish": dish,
+                "option_id": picked["option_id"], "order": order,
+            })
+
+        # a restaurant pick -> suggest their usual dish there, ask to send it to the room
         option_id = (user_input or {}).get("option_id")
         picked = next((o for o in self._options if o["option_id"] == option_id), None)
         if picked is None:
-            # unknown option — keep the pause open rather than crash
             return Resolved(done=False, repause="pick", payload={"options": self._options})
-        order = self._place(picked)
-        return Resolved(
-            done=True,
-            outcome={"placed": picked["restaurant_name"], "option_id": option_id, "order": order},
-        )
+        self._picked = picked
+        dish = (picked.get("items") or ["your usual"])[0]
+        hotel = (context.get("city") or "your hotel").split(",")[0]
+        return Resolved(done=False, repause="confirm_dish", payload={
+            "restaurant_name": picked["restaurant_name"], "dish": dish, "hotel": hotel,
+        })
