@@ -73,6 +73,27 @@ def test_dinner_pauses_at_pick_then_places():
 
 # --- recovery is just a re-pause ----------------------------------------------
 
+def test_typed_refinement_reshapes_the_options():
+    from arrival_agent.web.concierge import parse_intent
+    # intent parsing turns free text into a decision
+    assert parse_intent("something cheaper please", "pick")["mode"] == "cheaper"
+    assert parse_intent("got any ramen?", "pick") == {"decision": "refine", "mode": "cuisine", "term": "ramen", "text": "got any ramen?"}
+    assert parse_intent("not hungry", "pick")["decision"] == "decline"
+
+    c = TripController(curate_actions(Moment.ARRIVAL), _dinner_handlers())
+    first = c.start()
+    prices = [o["est_total"] for o in first.payload["options"]]
+
+    cheaper = c.respond({"decision": "refine", "mode": "cheaper"})
+    assert isinstance(cheaper, Pause) and cheaper.kind == "pick"   # still choosing
+    got = [o["est_total"] for o in cheaper.payload["options"]]
+    assert got == sorted(prices)                                   # reordered cheapest-first
+    assert "cheapest" in cheaper.payload["note"]
+
+    done = c.respond({"decision": "pick", "option_id": cheaper.payload["options"][0]["option_id"]})
+    assert isinstance(done, Done)
+
+
 def test_offline_restaurant_repauses_with_a_backup():
     c = TripController(curate_actions(Moment.ARRIVAL), _dinner_handlers())
     first = c.start()

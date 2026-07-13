@@ -158,6 +158,35 @@ def _context() -> dict:
             "fatigue": "high late-night arrival after a flight"}
 
 
+_CUISINES = ["ramen", "noodle", "thai", "mexican", "burger", "pizza", "sushi",
+             "indian", "asian", "chinese", "italian", "american", "vegetarian", "vegan"]
+_SKIP = ("skip", "no thanks", "not hungry", "nothing", "cancel", "don't", "stop", "nope")
+_CHEAP = ("cheap", "cheaper", "budget", "less", "inexpensive")
+_OTHER = ("other", "different", "else", "more", "again", "another")
+
+
+def parse_intent(text: str, kind: str) -> dict:
+    """Turn free text into a decision the controller understands. Rules now; an
+    LLM would slot in here at scale. Always carries the raw text for the echo."""
+    t = (text or "").lower().strip()
+    if any(w in t for w in _SKIP):
+        return {"decision": "decline", "text": text}
+    if kind == "pick":
+        if any(w in t for w in _CHEAP):
+            return {"decision": "refine", "mode": "cheaper", "text": text}
+        for cz in _CUISINES:
+            if cz in t:
+                return {"decision": "refine", "mode": "cuisine", "term": cz, "text": text}
+        if any(w in t for w in _OTHER):
+            return {"decision": "refine", "mode": "other", "text": text}
+        return {"decision": "refine", "mode": "unknown", "text": text}
+    if kind == "send" and any(w in t for w in ("send", "yes", "go ahead", "do it", "ok", "sure")):
+        return {"decision": "send", "text": text}
+    if kind == "snooze" and any(w in t for w in ("got it", "ok", "sure", "thanks")):
+        return {"decision": "snooze", "text": text}
+    return {"decision": "refine", "text": text}  # stray text -> handler re-pauses with a hint
+
+
 @dataclass
 class ConciergeRun:
     run_id: str
@@ -167,6 +196,7 @@ class ConciergeRun:
     response: asyncio.Future | None = None
     started: bool = False
     awaiting: bool = False
+    current: Pause | None = None  # the pause the user is answering (for say())
 
 
 class ConciergeRegistry:
@@ -190,6 +220,14 @@ class ConciergeRegistry:
             return False
         run.response.set_result(user_input)
         return True
+
+    def say(self, run_id: str, text: str) -> bool:
+        """The user typed something. Interpret it against the current pause and
+        feed the resulting decision into the controller."""
+        run = self._runs.get(run_id)
+        if run is None or not run.awaiting or run.current is None:
+            return False
+        return self.submit(run_id, parse_intent(text, run.current.kind))
 
     def discard(self, run_id: str) -> None:
         self._runs.pop(run_id, None)
@@ -218,10 +256,14 @@ async def drive(run: ConciergeRun) -> None:
                 await run.queue.put(("todo", _pause_payload(step)))
                 run.response = loop.create_future()
                 run.awaiting = True
+                run.current = step
                 user_input = await run.response
                 run.awaiting = False
+                run.current = None
                 await run.queue.put(("you", {
-                    "action_id": step.action_id, "decision": user_input.get("decision"),
+                    "action_id": step.action_id,
+                    "decision": user_input.get("decision"),
+                    "text": user_input.get("text"),
                 }))
                 step = await asyncio.to_thread(controller.respond, user_input)
             outcomes.extend(step.outcomes)  # step is Done for this moment

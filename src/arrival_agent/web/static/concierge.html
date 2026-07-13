@@ -68,7 +68,12 @@ body{margin:0;background:var(--bg);font-family:var(--sans);color:var(--ink);
     </div>
   </div>
   <div class="thread" id="thread"></div>
-  <div class="foot"><div class="fake">Ask the agent anything…</div></div>
+  <div class="foot" style="display:flex;gap:8px;align-items:center">
+    <input id="say" autocomplete="off" placeholder="Ask the agent — 'cheaper', 'mexican', 'skip'…"
+      style="flex:1;border:1px solid var(--rule,#e2e2e2);border-radius:18px;padding:9px 13px;font-size:13px;font-family:inherit;outline:none">
+    <button id="sayBtn" aria-label="send"
+      style="width:34px;height:34px;border:none;border-radius:50%;background:#0066ff;color:#fff;font-size:15px;cursor:pointer;flex:none">↑</button>
+  </div>
 </div>
 <script>
 const $ = s => document.querySelector(s);
@@ -90,6 +95,7 @@ function esc(s){ return (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;',
 function renderTodo(d){
   awaitingId = d.action_id;
   const p = d.payload || {};
+  if (p.note) el('bubble', esc(p.note));   // the agent's reply to a refinement / recovery
   if (d.kind === 'send'){
     const c = el('card');
     c.innerHTML = `<div class="lead">I drafted a note to the front desk so they hold your room:</div>
@@ -137,7 +143,7 @@ function start(){
     es = new EventSource(`/api/concierge/${runId}/stream`);
     es.addEventListener('agent', e => el('bubble', esc(JSON.parse(e.data).text)));
     es.addEventListener('todo', e => renderTodo(JSON.parse(e.data)));
-    es.addEventListener('you', e => { const d = JSON.parse(e.data); el('you', VERB[d.decision]||d.decision); });
+    es.addEventListener('you', e => { const d = JSON.parse(e.data); el('you', esc(d.text || VERB[d.decision] || d.decision)); });
     es.addEventListener('done', e => {
       const o = (JSON.parse(e.data).outcomes || []).map(x=>x.outcome);
       const placed = o.find(v=>v&&v.placed);
@@ -152,6 +158,16 @@ function start(){
     es.addEventListener('error', e => { try{ el('bubble', 'Something went wrong: '+esc(JSON.parse(e.data).message)); }catch(_){} });
   });
 }
+async function say(){
+  const inp = $('#say'); const text = (inp.value || '').trim();
+  if (!text || !runId) return;
+  inp.value = '';
+  await fetch(`/api/concierge/${runId}/say`, {method:'POST',
+    headers:{'content-type':'application/json'}, body: JSON.stringify({text})});
+}
+$('#sayBtn').onclick = say;
+$('#say').addEventListener('keydown', e => { if (e.key === 'Enter') say(); });
+
 document.querySelectorAll('#toggle button').forEach(b => {
   b.onclick = () => {
     document.querySelectorAll('#toggle button').forEach(x => x.classList.remove('on'));

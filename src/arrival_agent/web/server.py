@@ -120,6 +120,10 @@ class RespondRequest(BaseModel):
     restaurant_id: str | None = None
 
 
+class SayRequest(BaseModel):
+    text: str
+
+
 @app.post("/api/concierge/run")
 def concierge_run(seasoned: bool = False):
     run = concierge.registry.create(seasoned=seasoned)
@@ -156,6 +160,15 @@ def concierge_respond(run_id: str, req: RespondRequest):
     ok = concierge.registry.submit(run_id, req.model_dump(exclude_none=True))
     if not ok:
         return JSONResponse({"error": "run not awaiting a response"}, status_code=409)
+    return {"ok": True}
+
+
+@app.post("/api/concierge/{run_id}/say")
+def concierge_say(run_id: str, req: SayRequest):
+    """Free-text input — the agent interprets it and re-curates."""
+    ok = concierge.registry.say(run_id, req.text)
+    if not ok:
+        return JSONResponse({"error": "run not awaiting input"}, status_code=409)
     return {"ok": True}
 
 

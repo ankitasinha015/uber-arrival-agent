@@ -51,6 +51,9 @@ class HeadsUpHandler:
         return Prepared(pause="snooze", payload={"detail": item.detail})
 
     def resolve(self, item: ActionItem, user_input: dict, context: dict) -> Resolved:
+        if (user_input or {}).get("decision") == "refine":  # stray text — don't act
+            return Resolved(done=False, repause="snooze",
+                            payload={"detail": item.detail, "note": "Tap 'Got it', or say 'skip'."})
         return Resolved(done=True, outcome="acknowledged")
 
 
@@ -78,6 +81,9 @@ class NotifyHotelHandler:
         return Prepared(pause="send", payload={"draft": self._note})
 
     def resolve(self, item: ActionItem, user_input: dict, context: dict) -> Resolved:
+        if (user_input or {}).get("decision") == "refine":  # stray text — don't send
+            return Resolved(done=False, repause="send",
+                            payload={"draft": self._note, "note": "You can tap Send, or say 'skip'."})
         result = self._send(self._note or "")
         return Resolved(done=True, outcome={"sent": True, "note": self._note, "result": result})
 
@@ -120,8 +126,58 @@ class DinnerHandler:
         }
         return Prepared(pause="pick", payload=payload)
 
+    def _candidate_option(self, c: dict, i: int) -> dict:
+        """Turn a raw candidate (no price) into a surfaced option."""
+        return {
+            "option_id": f"opt-x{i}",
+            "restaurant_id": c["restaurant_id"],
+            "restaurant_name": c["restaurant_name"],
+            "items": ["House pick"],
+            "est_total": 19.0 + 3 * i,
+            "cuisine_tags": list(c.get("categories", [])),
+            "why_this_one": "another open spot near your hotel",
+            "est_delivery_at": self._options[0].get("est_delivery_at") if self._options else None,
+        }
+
+    def _refine(self, user_input: dict) -> Resolved:
+        """The user typed a refinement — re-shape the options and stay at the pick."""
+        mode = (user_input or {}).get("mode")
+        term = (user_input or {}).get("term")
+        opts = list(self._options)
+
+        if mode == "cheaper":
+            opts = sorted(opts, key=lambda o: o.get("est_total") or 999)
+            note = "sorted by price, cheapest first"
+        elif mode == "cuisine" and term:
+            t = term.lower()
+            def _m(names: list) -> bool:
+                return t in " ".join(names).lower()
+            kept = [o for o in opts if _m(o.get("cuisine_tags", []) + [o["restaurant_name"]])]
+            shown = {o["restaurant_id"] for o in kept}
+            extra = [c for c in self._candidates
+                     if _m(c.get("categories", []) + [c["restaurant_name"]])
+                     and c["restaurant_id"] not in shown]
+            for i, c in enumerate(extra[: max(0, 3 - len(kept))]):
+                kept.append(self._candidate_option(c, i))
+            opts, note = (kept, f"showing {term} spots") if kept else (
+                opts, f"nothing open nearby matched '{term}' — here's the set again")
+        elif mode == "other":
+            shown = {o["restaurant_id"] for o in opts}
+            fresh = [c for c in self._candidates if c["restaurant_id"] not in shown][:3]
+            opts, note = ([self._candidate_option(c, i) for i, c in enumerate(fresh)],
+                          "a different set nearby") if fresh else (
+                opts, "that's all that's open near you right now")
+        else:
+            note = "I can do cheaper, a cuisine (say 'mexican'), or 'something else' — or just tap a card."
+
+        self._options = opts
+        return Resolved(done=False, repause="pick", payload={"options": opts, "note": note})
+
     def resolve(self, item: ActionItem, user_input: dict, context: dict) -> Resolved:
         decision = (user_input or {}).get("decision")
+
+        if decision == "refine":
+            return self._refine(user_input)
 
         if decision in ("order_rejected", "offline"):
             rid = user_input.get("restaurant_id") or (
