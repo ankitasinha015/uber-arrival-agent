@@ -70,26 +70,52 @@ def _default_draft(context: dict) -> str:
 
 
 class NotifyHotelHandler:
-    """Draft a late-arrival note, pause for the user to send it."""
+    """Ask first, then draft-and-send. The traveler decides whether the hotel
+    hears about the late arrival at all — only on a yes do we draft the note and
+    pause for them to send it. 'no' skips the whole thing."""
 
     def __init__(self, send: Callable[[str], dict], draft: Callable[[dict], str] | None = None):
         self._send = send
         self._draft = draft or _default_draft
         self._note: str | None = None
 
+    def _ask(self, context: dict, hint: str | None = None) -> Prepared:
+        when = context.get("arrival_hhmm", "late tonight")
+        payload = {
+            "question": f"Your flight's delayed — want me to let the hotel know you'll arrive around {when}?",
+            "arrival_hhmm": when,
+        }
+        if hint:
+            payload["note"] = hint
+        return Prepared(pause="ask_hotel", payload=payload)
+
     def prepare(self, item: ActionItem, context: dict) -> Prepared:
-        self._note = self._draft(context)
-        return Prepared(pause="send", payload={"draft": self._note})
+        return self._ask(context)
 
     def resolve(self, item: ActionItem, user_input: dict, context: dict) -> Resolved:
         ui = user_input or {}
-        if ui.get("decision") == "refine":  # stray text — don't send, point them at Edit
+        decision = ui.get("decision")
+
+        if self._note is None:                     # still at the ask
+            if decision in ("yes", "notify", "send"):
+                self._note = self._draft(context)
+                return Resolved(done=False, repause="send", payload={"draft": self._note})
+            if decision in ("no", "decline", "skip"):
+                return Resolved(done=True, outcome={"sent": False, "skipped": True})
+            # stray/unknown text at the ask — re-ask with a nudge
+            hint = "Tap 'Yes, tell them' to notify the hotel, or 'No' to skip."
+            p = self._ask(context, hint)
+            return Resolved(done=False, repause="ask_hotel", payload=p.payload)
+
+        # note drafted — now at the send step
+        if decision == "refine":                   # stray text — don't send, point at Edit
             return Resolved(done=False, repause="send", payload={
                 "draft": self._note,
                 "note": "Tap Edit to change the note, Send to send it, or say 'skip'.",
             })
-        # honor an edited note if the user changed it
-        note = (ui.get("note") or "").strip() or self._note or ""
+        if decision in ("no", "decline"):          # backed out at the last moment
+            return Resolved(done=True, outcome={"sent": False, "skipped": True})
+        note = (ui.get("note") or "").strip() or self._note or ""   # honor an edited note
         self._note = note
         result = self._send(note)
         return Resolved(done=True, outcome={"sent": True, "note": note, "result": result})

@@ -115,7 +115,14 @@ function renderTodo(d){
   awaitingId = d.action_id;
   const p = d.payload || {};
   if (p.note) el('bubble', esc(p.note));   // the agent's reply to a refinement / recovery
-  if (d.kind === 'send'){
+  if (d.kind === 'ask_hotel'){
+    const c = el('card');
+    c.innerHTML = `<div class="lead">${esc(p.question)}</div>
+      <div class="row"><button class="btn primary" data-a="yes">Yes, tell the hotel</button>
+      <button class="btn ghost" data-a="no">No, I'll handle it</button></div>`;
+    c.querySelector('[data-a="yes"]').onclick = () => { markDone(c); respond(d.action_id, {decision:'yes'}); };
+    c.querySelector('[data-a="no"]').onclick = () => { markDone(c); respond(d.action_id, {decision:'no'}); };
+  } else if (d.kind === 'send'){
     const c = el('card');
     c.innerHTML = `<div class="lead">I drafted a note to the front desk so they hold your room:</div>
       <div class="draft" data-draft>"${esc(p.draft)}"</div>
@@ -175,7 +182,7 @@ function renderTodo(d){
 }
 function markDone(card){ card.classList.add('dim'); }
 
-const VERB = {send:'Sent the note', pick:'Picked', confirm:'Order it', back:'Back to options', snooze:'Got it', decline:'No thanks'};
+const VERB = {yes:'Yes, tell the hotel', no:"No, I'll handle it", send:'Sent the note', pick:'Picked', confirm:'Order it', back:'Back to options', snooze:'Got it', decline:'No thanks'};
 // scenario is driven by the trip; ?mode=seasoned|smooth still works for demos
 let mode = new URLSearchParams(location.search).get('mode') || 'new';
 function start(){

@@ -157,7 +157,7 @@ _SIGNALS = {
 _DEP_INTRO_HIGH = "Before you head out — security's running long right now. Leave sooner:"
 _DEP_INTRO_LOW = "Before you head out — one thing worth doing:"
 _GATE_HOTEL_INTRO = ("Hours later, at the gate — your flight slipped 45 min, so you'll land around "
-                     "1:12 AM. Let me give the front desk a heads-up so they hold your room:")
+                     "1:12 AM.")
 _WELCOME = f"Welcome to {CITY} 👋"
 _EXIT_LINE = (f"You're about {AIRPORT_EXIT_MIN} min from being out of the airport "
               f"(deplane, then bags) — in your room by ~1:12 AM.")
@@ -284,6 +284,10 @@ def parse_intent(text: str, kind: str) -> dict:
         return {"decision": "send", "text": text}
     if kind == "snooze" and any(w in t for w in ("got it", "ok", "sure", "thanks")):
         return {"decision": "snooze", "text": text}
+    if kind == "ask_hotel":
+        if any(w in t for w in ("yes", "notify", "tell", "let them", "go ahead", "sure", "ok", "please", "do it")):
+            return {"decision": "yes", "text": text}
+        return {"decision": "no", "text": text}
     if kind == "confirm_dish":
         if any(w in t for w in ("order", "yes", "confirm", "send", "get it", "go ahead", "sure", "please")):
             return {"decision": "confirm", "text": text}

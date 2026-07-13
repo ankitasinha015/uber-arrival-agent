@@ -51,6 +51,8 @@ def _factory():
 
 
 def _responder_happy(pause: dict) -> dict:
+    if pause["kind"] == "ask_hotel":                            # yes, notify the hotel
+        return {"decision": "yes"}
     if pause["kind"] == "send":
         return {"decision": "send"}
     if pause["kind"] == "confirm_dish":                          # accept the suggested dish
@@ -59,7 +61,9 @@ def _responder_happy(pause: dict) -> dict:
 
 
 def _responder_with_recovery(pause: dict) -> dict:
-    # decline no; send the note; on the first dinner pause report offline, then pick
+    # yes to the hotel; send the note; on the first dinner pause report offline, then pick
+    if pause["kind"] == "ask_hotel":
+        return {"decision": "yes"}
     if pause["kind"] == "send":
         return {"decision": "send"}
     if pause["kind"] == "confirm_dish":
@@ -82,15 +86,15 @@ def _outcome_shape(outcomes):
 def test_raw_and_langgraph_are_identical_happy_path():
     praw, oraw = drive_raw(_factory, _responder_happy)
     plg, olg = drive_langgraph(_factory, _responder_happy, thread_id="happy")
-    assert praw == plg == ["send", "pick", "confirm_dish"]
+    assert praw == plg == ["ask_hotel", "send", "pick", "confirm_dish"]
     assert _outcome_shape(oraw) == _outcome_shape(olg)
 
 
 def test_raw_and_langgraph_are_identical_through_recovery():
     praw, oraw = drive_raw(_factory, _responder_with_recovery)
     plg, olg = drive_langgraph(_factory, _responder_with_recovery, thread_id="recover")
-    # send, then a pick that's rejected, then a pick on the recovered set, then confirm the dish
-    assert praw == plg == ["send", "pick", "pick", "confirm_dish"]
+    # ask the hotel, send, then a pick that's rejected, a pick on the recovered set, confirm the dish
+    assert praw == plg == ["ask_hotel", "send", "pick", "pick", "confirm_dish"]
     assert _outcome_shape(oraw) == _outcome_shape(olg)
     # both actually placed a dinner order
     assert any(isinstance(o["outcome"], dict) and o["outcome"].get("placed") for o in oraw)

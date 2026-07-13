@@ -155,8 +155,10 @@ def test_loop_advances_to_the_next_todo():
     c = TripController(actions, handlers, context={"arrival_hhmm": "1:15 AM"})
 
     step1 = c.start()
-    assert step1.kind == "send"                       # first to-do: notify hotel
-    assert "hold my room" in step1.payload["draft"]
+    assert step1.kind == "ask_hotel"                  # first to-do: ASK before notifying
+    draft = c.respond({"decision": "yes"})            # yes -> draft the note to send
+    assert draft.kind == "send"
+    assert "hold my room" in draft.payload["draft"]
 
     step2 = c.respond({"decision": "send"})           # send -> CHECK FOR NEXT
     assert isinstance(step2, Pause) and step2.kind == "pick"   # advanced to dinner
