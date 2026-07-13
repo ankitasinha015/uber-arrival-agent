@@ -191,7 +191,7 @@ def _trip_context(mode: str) -> dict:
         "arrival": arrival,
         "security_min": sig.get("security_wait_min"),
         "delay_min": sig.get("delay_min", 0),
-        "source": "from your booking email · taste from your Uber Eats history",
+        "source": "from your booking email",
     }
 
 

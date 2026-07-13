@@ -69,16 +69,11 @@ body{margin:0;background:var(--bg);font-family:var(--sans);color:var(--ink);
   <div class="bar">
     <div class="avatar">A</div>
     <div class="who"><b>Arrival agent</b><span>watching SFO arrival · tonight</span></div>
-    <div class="toggle" id="toggle">
-      <button data-mode="new" class="on">delayed</button>
-      <button data-mode="seasoned">5th trip</button>
-      <button data-mode="smooth">smooth</button>
-    </div>
   </div>
   <div class="ctx" id="ctx" hidden></div>
   <div class="thread" id="thread"></div>
   <div class="foot" style="display:flex;gap:8px;align-items:center">
-    <input id="say" autocomplete="off" placeholder="Ask the agent — 'cheaper', 'mexican', 'skip'…"
+    <input id="say" autocomplete="off" placeholder="Ask the agent anything…"
       style="flex:1;border:1px solid var(--rule,#e2e2e2);border-radius:18px;padding:9px 13px;font-size:13px;font-family:inherit;outline:none">
     <button id="sayBtn" aria-label="send"
       style="width:34px;height:34px;border:none;border-radius:50%;background:#0066ff;color:#fff;font-size:15px;cursor:pointer;flex:none">↑</button>
@@ -152,7 +147,8 @@ function renderTodo(d){
 function markDone(card){ card.classList.add('dim'); }
 
 const VERB = {send:'Sent the note', pick:'Picked', snooze:'Got it', decline:'No thanks'};
-let mode = 'new';
+// scenario is driven by the trip; ?mode=seasoned|smooth still works for demos
+let mode = new URLSearchParams(location.search).get('mode') || 'new';
 function start(){
   thread.innerHTML = '';
   fetch(`/api/concierge/run?mode=${mode}`, {method:'POST'}).then(r=>r.json()).then(r=>{
@@ -160,7 +156,7 @@ function start(){
     if (es) es.close();
     es = new EventSource(`/api/concierge/${runId}/stream`);
     es.addEventListener('context', e => renderCtx(JSON.parse(e.data)));
-    es.addEventListener('read', e => { const d = JSON.parse(e.data); el('read', 'agent read · ' + esc(d.text)); });
+    es.addEventListener('read', e => { const d = JSON.parse(e.data); el('read', esc(d.text.split('→')[0].trim())); });
     es.addEventListener('agent', e => el('bubble', esc(JSON.parse(e.data).text)));
     es.addEventListener('todo', e => renderTodo(JSON.parse(e.data)));
     es.addEventListener('you', e => { const d = JSON.parse(e.data); el('you', esc(d.text || VERB[d.decision] || d.decision)); });
@@ -188,14 +184,6 @@ async function say(){
 $('#sayBtn').onclick = say;
 $('#say').addEventListener('keydown', e => { if (e.key === 'Enter') say(); });
 
-document.querySelectorAll('#toggle button').forEach(b => {
-  b.onclick = () => {
-    document.querySelectorAll('#toggle button').forEach(x => x.classList.remove('on'));
-    b.classList.add('on');
-    mode = b.dataset.mode;
-    start();
-  };
-});
 start();
 </script>
 </body>
