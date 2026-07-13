@@ -173,11 +173,15 @@ def concierge_say(run_id: str, req: SayRequest):
     return {"ok": True}
 
 
+_NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
+
+
 @app.get("/concierge", response_class=HTMLResponse)
 def concierge_index():
-    return (_STATIC / "concierge.html").read_text(encoding="utf-8")
+    # no-store so the browser never serves a stale build after an edit
+    return HTMLResponse((_STATIC / "concierge.html").read_text(encoding="utf-8"), headers=_NO_CACHE)
 
 
 @app.get("/", response_class=HTMLResponse)
 def index():
-    return (_STATIC / "index.html").read_text(encoding="utf-8")
+    return HTMLResponse((_STATIC / "index.html").read_text(encoding="utf-8"), headers=_NO_CACHE)
