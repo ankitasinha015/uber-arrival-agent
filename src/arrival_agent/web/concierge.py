@@ -96,6 +96,57 @@ def _design(candidates, context):
     return cs
 
 
+# --- arrival: the city welcome, airport-exit time, and cuisine-ranked dinner ---
+
+CITY = "San Francisco"
+AIRPORT_EXIT_MIN = 35   # deplane + bags (would be a live/airport feed in prod)
+
+# The user's Uber Eats order preference — favourite cuisines first (mocked; in a
+# real Uber build this is first-party order history).
+_UBER_EATS_PREF = ["Ramen", "Mexican", "Thai", "Burger", "American", "Pizza"]
+
+# Cuisine-varied places near the hotel (mocked feed).
+_ARRIVAL_RESTAURANTS = [
+    {"restaurant_id": "a-ippudo", "restaurant_name": "Ippudo", "cuisine": "Ramen", "est_total": 19, "items": ["Tonkotsu Ramen"]},
+    {"restaurant_id": "a-tropi", "restaurant_name": "Tropisueño", "cuisine": "Mexican", "est_total": 24, "items": ["Carnitas Tacos"]},
+    {"restaurant_id": "a-super", "restaurant_name": "Super Duper Burgers", "cuisine": "Burger", "est_total": 16, "items": ["Burger, Fries"]},
+    {"restaurant_id": "a-grove", "restaurant_name": "The Grove", "cuisine": "American", "est_total": 22, "items": ["Roast Chicken"]},
+    {"restaurant_id": "a-osha", "restaurant_name": "Osha Thai", "cuisine": "Thai", "est_total": 21, "items": ["Pad See Ew"]},
+]
+
+
+def _arrival_find(context):
+    return list(_ARRIVAL_RESTAURANTS)
+
+
+def _arrival_design(candidates, context):
+    """Rank places near the hotel by the cuisines the user orders most on Uber
+    Eats, mark their usual, and show the range of cuisines available."""
+    rank = {c: i for i, c in enumerate(_UBER_EATS_PREF)}
+    ordered = sorted(candidates, key=lambda r: rank.get(r.get("cuisine"), 99))
+    options = []
+    for i, r in enumerate(ordered[:4]):
+        usual = i == 0
+        why = (f"your usual — you order {r['cuisine'].lower()} most trips" if usual
+               else f"{r['cuisine']} · near your hotel")
+        o = ChoiceOption(
+            option_id=f"opt-{i + 1}", restaurant_id=r["restaurant_id"],
+            restaurant_name=r["restaurant_name"], items=list(r["items"]),
+            est_total=float(r["est_total"]), cuisine_tags=[r["cuisine"]],
+            why_this_one=why,
+        )
+        o.est_delivery_at = context.get("deliver_at", _DELIVER)
+        options.append(o)
+
+    class _CS:
+        pass
+    cs = _CS()
+    cs.options, cs.axis = options, ChoiceAxis.CUISINE
+    cs.why_these = "ranked by the cuisines you order most on Uber Eats"
+    cs.lead = f"Want to sort dinner? Here are places near {_HOTEL.split(',')[0]}, by the cuisines you usually order:"
+    return cs
+
+
 # Situation feeds per mode (mocked, real-shaped) — these drive the intensity dial.
 _SIGNALS = {
     "new":      {"delay_min": 45, "arrival_hour": 1,  "security_wait_min": 45, "pre_flight_min": 120, "security_fresh": True},
@@ -105,13 +156,14 @@ _SIGNALS = {
 
 _DEP_INTRO_HIGH = "Before you head out — security's running long right now. Leave sooner:"
 _DEP_INTRO_LOW = "Before you head out — one thing worth doing:"
-_DELAY_INTRO_NEW = ("Hours later, at the gate — your flight just slipped 45 min. You'll reach "
-                    "your room around 1:12 AM, and kitchens near Hotel Zephyr close soon. "
-                    "A couple of things worth handling:")
-_DELAY_INTRO_SEASONED = ("Welcome back. Your flight slipped 45 min — you'll reach your room around "
-                         "1:12 AM. You usually sort the hotel yourself, so I'll just line up dinner:")
-_SMOOTH_INTRO = ("You're arriving early tonight (~9:40 PM) — everything's on track: kitchens are "
-                 "open and the security line's clear. One optional thing, then I'll leave you be:")
+_GATE_HOTEL_INTRO = ("Hours later, at the gate — your flight slipped 45 min, so you'll land around "
+                     "1:12 AM. Let me give the front desk a heads-up so they hold your room:")
+_WELCOME = f"Welcome to {CITY} 👋"
+_EXIT_LINE = (f"You're about {AIRPORT_EXIT_MIN} min from being out of the airport "
+              f"(deplane, then bags) — in your room by ~1:12 AM.")
+_SMOOTH_ARRIVAL = [f"Welcome to {CITY} 👋",
+                   "You're in early tonight — everything's on track, kitchens are open and the "
+                   "line was clear. One optional thing, then I'll leave you be:"]
 
 
 def _departure_segment(sig, memory):
@@ -134,36 +186,40 @@ def _departure_segment(sig, memory):
     return (intro, al)
 
 
-def _arrival_segment(sig, memory, mode):
-    """HIGH → notify hotel + dinner. LOW (calm) → just the optional hotel offer."""
-    level = assess(Moment.ARRIVAL, sig)
-    items = [
-        curate_actions(Moment.DELAY).items[0],     # notify_hotel
-        curate_actions(Moment.ARRIVAL).items[0],   # dinner
-    ]
-    if level == Intensity.LOW:
-        items = [i for i in items if i.kind == ActionKind.NOTIFY_HOTEL]
+def _hotel_list(memory):
+    items = [curate_actions(Moment.DELAY).items[0]]  # notify_hotel
     if memory is not None:
         items = list(memory.shape_actions(Moment.DELAY, items))
-    intro = _SMOOTH_INTRO if mode == "smooth" else (
-        _DELAY_INTRO_SEASONED if mode == "seasoned" else _DELAY_INTRO_NEW)
-    al = ActionList(
-        moment=Moment.DELAY,
-        reasoning="a delayed flight puts the room hold and a late meal at risk",
-        items=items, intensity=level.value, read=read(Moment.ARRIVAL, sig),
-    )
-    return (intro, al)
+    return items
 
 
 def _segments(memory, mode: str) -> list:
-    """The trip as a sequence of (intro, ActionList) moments, each sized by the
-    intensity dial. A calm trip yields one light offer; a rough one, the full list."""
+    """The trip as a sequence of (intro, ActionList) moments, sized by the dial.
+    intro may be a list of lines (the arrival welcome is several agent turns)."""
     sig = _SIGNALS.get(mode, _SIGNALS["new"])
     segs = []
+
     dep = _departure_segment(sig, memory)
     if dep:
         segs.append(dep)
-    segs.append(_arrival_segment(sig, memory, mode))
+
+    if assess(Moment.ARRIVAL, sig) == Intensity.HIGH:
+        # at the gate: hold the room (a seasoned traveler handles it themselves,
+        # so memory drops it and this segment is skipped)
+        hotel = _hotel_list(memory)
+        if hotel:
+            segs.append((_GATE_HOTEL_INTRO, ActionList(
+                moment=Moment.DELAY, reasoning="hold the room", items=hotel,
+                intensity="high", read=read(Moment.DELAY, sig))))
+        # on arrival: welcome + airport-exit time + cuisine-ranked dinner
+        segs.append(([_WELCOME, _EXIT_LINE], ActionList(
+            moment=Moment.ARRIVAL, reasoning="dinner near the hotel",
+            items=[curate_actions(Moment.ARRIVAL).items[0]], intensity="high", read="")))
+    else:
+        # calm arrival: welcome + one optional hotel offer, no dinner
+        segs.append((_SMOOTH_ARRIVAL, ActionList(
+            moment=Moment.DELAY, reasoning="all good", items=_hotel_list(memory),
+            intensity="low", read="")))
     return segs
 
 
@@ -174,8 +230,8 @@ def _handlers():
             send=lambda note: send_hotel_note(_HOTEL, note),
         ),
         ActionKind.DINNER: DinnerHandler(
-            find=_find,
-            design=_design,
+            find=_arrival_find,
+            design=_arrival_design,
             place=orders_mod.place_order,
             recover=recover_from_rejection,
         ),
@@ -298,7 +354,8 @@ async def drive(run: ConciergeRun) -> None:
         for intro, actions in run.segments:
             if getattr(actions, "read", ""):   # show the signals -> verdict (data flow)
                 await run.queue.put(("read", {"text": actions.read, "intensity": actions.intensity}))
-            await run.queue.put(("agent", {"text": intro}))
+            for line in (intro if isinstance(intro, list) else [intro]):
+                await run.queue.put(("agent", {"text": line}))
             controller = TripController(actions, _handlers(), _context(run.mode))
             step = await asyncio.to_thread(controller.start)
             while isinstance(step, Pause):

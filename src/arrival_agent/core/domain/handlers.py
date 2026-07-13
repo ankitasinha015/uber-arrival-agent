@@ -130,6 +130,7 @@ class DinnerHandler:
             "axis": getattr(cs.axis, "value", cs.axis),
             "why_these": cs.why_these,
             "options": self._options,
+            "lead": getattr(cs, "lead", None),
         }
         return Prepared(pause="pick", payload=payload)
 
