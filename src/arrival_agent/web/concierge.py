@@ -182,6 +182,19 @@ def _handlers():
     }
 
 
+def _trip_context(mode: str) -> dict:
+    """The facts the agent pulled — shown at the top so you see its inputs."""
+    sig = _SIGNALS.get(mode, _SIGNALS["new"])
+    arrival = "~9:40 PM (on time)" if mode == "smooth" else "~1:12 AM (delayed 45m)"
+    return {
+        "flight": "UA 517", "route": "EWR → SFO", "hotel": "Hotel Zephyr, San Francisco",
+        "arrival": arrival,
+        "security_min": sig.get("security_wait_min"),
+        "delay_min": sig.get("delay_min", 0),
+        "source": "from your booking email · taste from your Uber Eats history",
+    }
+
+
 def _context(mode: str = "new") -> dict:
     arrival_hhmm = "9:40 PM" if mode == "smooth" else "1:15 AM"
     return {"arrival_hhmm": arrival_hhmm, "city": _HOTEL, "deliver_at": _DELIVER,
@@ -281,6 +294,7 @@ async def drive(run: ConciergeRun) -> None:
         run.queue = asyncio.Queue()
     outcomes: list[dict] = []
     try:
+        await run.queue.put(("context", _trip_context(run.mode)))
         for intro, actions in run.segments:
             if getattr(actions, "read", ""):   # show the signals -> verdict (data flow)
                 await run.queue.put(("read", {"text": actions.read, "intensity": actions.intensity}))
