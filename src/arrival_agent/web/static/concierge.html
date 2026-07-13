@@ -35,6 +35,9 @@ body{margin:0;background:var(--bg);font-family:var(--sans);color:var(--ink);
 .card .lead{font-size:13.5px;line-height:1.45;margin-bottom:8px}
 .draft{border-left:2px solid var(--rule-soft);padding:7px 11px;font-size:12px;color:var(--ink-soft);
   font-style:italic;line-height:1.4;margin:6px 0 10px}
+.draft-edit{width:100%;min-height:76px;font-family:inherit;font-size:12px;color:var(--ink);
+  border:1px solid var(--accent);border-radius:8px;padding:8px 10px;resize:vertical;line-height:1.45;
+  margin:6px 0 10px;outline:none}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .btn{padding:9px 15px;border-radius:9px;font-size:12.5px;font-weight:600;cursor:pointer;
   border:1px solid var(--rule-soft);background:var(--surface);color:var(--ink)}
@@ -112,11 +115,22 @@ function renderTodo(d){
   if (d.kind === 'send'){
     const c = el('card');
     c.innerHTML = `<div class="lead">I drafted a note to the front desk so they hold your room:</div>
-      <div class="draft">"${esc(p.draft)}"</div>
+      <div class="draft" data-draft>"${esc(p.draft)}"</div>
       <div class="row"><button class="btn primary" data-a="send">Send</button>
+      <button class="btn" data-a="edit">Edit</button>
       <button class="btn ghost" data-a="decline">No thanks</button>
       <span class="note">you approve · nothing sent yet</span></div>`;
-    c.querySelector('[data-a="send"]').onclick = () => { markDone(c); respond(d.action_id, {decision:'send'}); };
+    const draftEl = c.querySelector('[data-draft]');
+    let ta = null;
+    c.querySelector('[data-a="edit"]').onclick = () => {
+      if (ta){ ta.focus(); return; }
+      ta = document.createElement('textarea'); ta.className = 'draft-edit'; ta.value = p.draft;
+      draftEl.replaceWith(ta); ta.focus();
+    };
+    c.querySelector('[data-a="send"]').onclick = () => {
+      const note = ta ? ta.value.trim() : null;
+      markDone(c); respond(d.action_id, note ? {decision:'send', note} : {decision:'send'});
+    };
     c.querySelector('[data-a="decline"]').onclick = () => { markDone(c); respond(d.action_id, {decision:'decline'}); };
   } else if (d.kind === 'pick'){
     const c = el('card');

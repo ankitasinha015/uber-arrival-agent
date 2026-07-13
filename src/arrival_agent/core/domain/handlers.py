@@ -62,7 +62,11 @@ class HeadsUpHandler:
 
 def _default_draft(context: dict) -> str:
     when = context.get("arrival_hhmm", "late tonight")
-    return f"Guest arriving around {when}. Please hold the reservation."
+    return (
+        f"Hello, I have a reservation arriving later than planned tonight, around "
+        f"{when}. Could you please hold my room and note the late arrival so check-in "
+        f"is ready when I get there? Thank you very much."
+    )
 
 
 class NotifyHotelHandler:
@@ -78,11 +82,17 @@ class NotifyHotelHandler:
         return Prepared(pause="send", payload={"draft": self._note})
 
     def resolve(self, item: ActionItem, user_input: dict, context: dict) -> Resolved:
-        if (user_input or {}).get("decision") == "refine":  # stray text — don't send
-            return Resolved(done=False, repause="send",
-                            payload={"draft": self._note, "note": "You can tap Send, or say 'skip'."})
-        result = self._send(self._note or "")
-        return Resolved(done=True, outcome={"sent": True, "note": self._note, "result": result})
+        ui = user_input or {}
+        if ui.get("decision") == "refine":  # stray text — don't send, point them at Edit
+            return Resolved(done=False, repause="send", payload={
+                "draft": self._note,
+                "note": "Tap Edit to change the note, Send to send it, or say 'skip'.",
+            })
+        # honor an edited note if the user changed it
+        note = (ui.get("note") or "").strip() or self._note or ""
+        self._note = note
+        result = self._send(note)
+        return Resolved(done=True, outcome={"sent": True, "note": note, "result": result})
 
 
 # --- dinner (arrival) ---------------------------------------------------------

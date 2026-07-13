@@ -118,6 +118,7 @@ class RespondRequest(BaseModel):
     decision: str
     option_id: str | None = None
     restaurant_id: str | None = None
+    note: str | None = None
 
 
 class SayRequest(BaseModel):

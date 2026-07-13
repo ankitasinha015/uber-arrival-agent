@@ -151,7 +151,7 @@ def test_loop_advances_to_the_next_todo():
 
     step1 = c.start()
     assert step1.kind == "send"                       # first to-do: notify hotel
-    assert "hold the reservation" in step1.payload["draft"]
+    assert "hold my room" in step1.payload["draft"]
 
     step2 = c.respond({"decision": "send"})           # send -> CHECK FOR NEXT
     assert isinstance(step2, Pause) and step2.kind == "pick"   # advanced to dinner
