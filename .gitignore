@@ -48,3 +48,5 @@ serve_local.py
 # LangGraph SQLite checkpointer (durable trip state)
 concierge_checkpoints.sqlite
 *.sqlite
+*.sqlite-shm
+*.sqlite-wal
