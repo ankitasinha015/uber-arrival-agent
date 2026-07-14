@@ -104,7 +104,21 @@ def _design(candidates, context):
 
 # --- arrival: the city welcome, airport-exit time, and cuisine-ranked dinner ---
 
-AIRPORT_EXIT_MIN = 35   # deplane + bags (would be a live/airport feed in prod)
+AIRPORT_EXIT_MIN = 35        # domestic: deplane + baggage claim
+INTL_EXIT_MIN = 80           # international: + passport control/immigration + customs
+RIDE_TO_HOTEL_MIN = 15       # airport → hotel, rough
+
+# Non-US arrival airports — an arrival here (from a US origin) is international, so
+# the traveler clears immigration + customs, which runs long. (Would be a real
+# airport/immigration feed in prod.)
+_INTL_AIRPORTS = {"BER", "LHR", "CDG", "FRA", "AMS", "MAD", "FCO", "NRT", "HND",
+                  "ICN", "SIN", "HKG", "DXB", "YYZ", "MEX", "GRU", "SYD"}
+
+
+def _is_international(route: str) -> bool:
+    """route like 'JFK → BER' — international if the arrival airport is outside the US."""
+    dest = route.split("→")[-1].strip() if route else ""
+    return dest in _INTL_AIRPORTS
 
 # The user's Uber Eats taste profile — favourite cuisines first. This is behavior
 # that travels WITH you (built from order history across cities), NOT a "usual
@@ -496,8 +510,18 @@ def _segments(memory, mode: str) -> list:
     delay = sig.get("delay_min", 0)
     arr = _arrival_str(mode)   # single source of truth: scheduled + delay / change
     welcome = f"Welcome to {city} 👋"
-    exit_line = (f"You're about {AIRPORT_EXIT_MIN} min from being out of the airport "
-                 f"(deplane, then bags) — in your room by ~{arr}.")
+    # international arrivals clear immigration + customs, so the exit runs much longer
+    intl = _is_international(loc.get("route", ""))
+    exit_min = INTL_EXIT_MIN if intl else AIRPORT_EXIT_MIN
+    room_dt = _arrival_dt(mode) + timedelta(minutes=exit_min + RIDE_TO_HOTEL_MIN)
+    room_str = room_dt.strftime("%I:%M %p").lstrip("0")
+    if intl:
+        exit_line = (f"You're about {exit_min} min from being out of the airport — deplane, "
+                     f"then the immigration line (international arrivals run long), baggage, "
+                     f"and customs. Figure in your room by ~{room_str}.")
+    else:
+        exit_line = (f"You're about {exit_min} min from being out of the airport "
+                     f"(deplane, then bags) — in your room by ~{room_str}.")
     if fc:  # the airline rebooked him — announce the change, then take care of the hotel
         gate_intro = [
             f"✈️ Flight change — the airline moved you off {loc['flight']} onto {fc['to_flight']}.",
