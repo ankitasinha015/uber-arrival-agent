@@ -143,6 +143,55 @@ def taste_for(tid: str) -> list[str]:
     return [cz for cz, _ in counts.most_common()]
 
 
+# Cuisine exemplars — a few reference phrases per taste cuisine. A restaurant is
+# classified by cosine similarity to these, with a CONFIDENCE THRESHOLD: below it we
+# return None (honest "unknown") instead of forcing a weak match. This replaces the
+# greedy regex aliases (which mis-bucketed Korean BBQ as American); the RAG eval showed
+# the vector store hedges on ambiguous cuisines (Korean BBQ → ~0.37), so a threshold
+# rejects them cleanly.
+_CUISINE_EXEMPLARS = {
+    "Ramen": ["ramen restaurant", "japanese ramen noodle house", "tonkotsu ramen shop"],
+    "Mexican": ["mexican restaurant", "taqueria tacos burritos", "tex-mex cantina"],
+    "Thai": ["thai restaurant", "pad thai green curry noodles"],
+    "Burger": ["burger joint", "cheeseburger fast food", "smashburger shack"],
+    "American": ["american restaurant", "diner comfort food", "new american bistro"],
+    "Pizza": ["pizzeria", "italian pizza restaurant", "neapolitan pizza"],
+}
+_exemplar_vecs = None
+# Calibrated on clean vs adversarial restaurants: confident correct matches score
+# 0.72–0.81 (Shake Shack→Burger, Ippudo→Ramen, Los Tacos→Mexican); every ambiguous
+# case falls ≤0.56 (Korean BBQ→0.55, sushi→0.56, German→0.53, French→0.47). 0.60
+# sits in the clean gap — confident matches pass, everything ambiguous → None (honest).
+CLASSIFY_THRESHOLD = 0.60
+
+
+def _cuisine_exemplars():
+    global _exemplar_vecs
+    if _exemplar_vecs is None:
+        import numpy as np
+        _exemplar_vecs = {cz: np.mean(_embed(ph), axis=0) for cz, ph in _CUISINE_EXEMPLARS.items()}
+    return _exemplar_vecs
+
+
+def classify_cuisine(name: str, categories: list[str], cuisines: list[str],
+                     threshold: float = CLASSIFY_THRESHOLD):
+    """Best-matching taste cuisine for a restaurant, by vector similarity to exemplars.
+    Returns (cuisine, score) above the threshold, else (None, score) — an honest
+    'no confident match' rather than a forced weak one. `cuisines` scopes the buckets."""
+    import numpy as np
+    v = np.array(_embed([f"{name} — {', '.join(categories)}"])[0])
+    ex = _cuisine_exemplars()
+    best, best_s = None, -1.0
+    for cz in cuisines:
+        e = ex.get(cz)
+        if e is None:
+            continue
+        s = float(np.dot(v, e) / ((np.linalg.norm(v) * np.linalg.norm(e)) or 1))
+        if s > best_s:
+            best, best_s = cz, s
+    return (best, round(best_s, 3)) if best_s >= threshold else (None, round(best_s, 3))
+
+
 def top_dish(tid: str, cuisine: str) -> str | None:
     """The traveler's most-ordered DISH in a cuisine, from their Chroma order
     history — used to explain a suggestion ('you order Double Cheeseburgers')."""

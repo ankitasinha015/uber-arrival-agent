@@ -59,29 +59,45 @@ def check_extraction(got: dict, expected: dict, fields: list[str]):
 
 # --- Choice set: axis spread (binary LLM judge) -------------------------------
 
-def judge_axis_spread(cs: dict) -> dict:
-    """BINARY replacement for the old 1-5 Likert quality judge. One question:
-    do the options MEANINGFULLY differ along their stated axis? PASS/FAIL, with a
-    reason. Live LLM call; validated against human labels in gold.py."""
+# Pin the judge model to a stable id. A floating alias can drift silently between
+# provider updates; a dated snapshot keeps validated TPR/TNR meaningful.
+JUDGE_MODEL = "claude-sonnet-4-5"
+
+
+def _opts_str(cs: dict) -> str:
+    return "; ".join(f"{o['restaurant_name']} ({o.get('why_this_one', '')})"
+                     for o in cs.get("options", []))
+
+
+def judge_axis_spread(cs: dict, examples=None, model: str = JUDGE_MODEL) -> dict:
+    """BINARY replacement for the old 1-5 Likert quality judge. One question: do the
+    options MEANINGFULLY differ along their stated axis? PASS/FAIL + reason. Optional
+    few-shot `examples` = [(choice_set, pass_bool)] (from the TRAIN split only).
+    Validated against human labels via validate_judge.py."""
     from arrival_agent.core.config import anthropic_key
     import anthropic
 
-    opts = "; ".join(
-        f"{o['restaurant_name']} ({o.get('why_this_one', '')})" for o in cs.get("options", [])
-    )
+    shots = ""
+    for ex_cs, ex_pass in (examples or []):
+        shots += f"Axis '{ex_cs.get('axis')}': {_opts_str(ex_cs)}\n-> {{\"pass\": {str(bool(ex_pass)).lower()}}}\n\n"
     prompt = (
-        f"A late-night arrival agent built a dinner choice set on the axis "
-        f"'{cs.get('axis')}'. Options: {opts}.\n\n"
-        "Question: do these options MEANINGFULLY differ along that stated axis (a real, "
-        "useful spread), rather than being near-duplicates or varying on a different "
-        "axis than the one stated? Reply ONLY JSON: "
-        '{"pass": true|false, "reason": "<one short line>"}.'
+        "Decide if a dinner choice set's options MEANINGFULLY differ along their stated "
+        "axis (a real, useful spread) rather than near-duplicates or varying on a "
+        "DIFFERENT axis than the one stated.\n"
+        "An axis is spread when the options sit at DIFFERENT points on it:\n"
+        "- cuisine: different cuisines;\n"
+        "- speed_vs_quality: quick vs balanced vs best/slower;\n"
+        "- volume: a light bite vs a meal vs a feast;\n"
+        "- familiarity_vs_novelty: a usual favorite vs a new/novel pick vs a lighter/safer option.\n"
+        "PASS as long as the options occupy different points on the stated axis. FAIL only "
+        "near-duplicates, or options that vary on a different axis than the one stated.\n\n"
+        + (f"Examples:\n{shots}" if shots else "")
+        + f"Now judge this one.\nAxis '{cs.get('axis')}': {_opts_str(cs)}\n"
+        'Reply ONLY JSON: {"pass": true|false, "reason": "<one short line>"}.'
     )
     client = anthropic.Anthropic(api_key=anthropic_key())
-    resp = client.messages.create(
-        model="claude-sonnet-4-5", max_tokens=120,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    resp = client.messages.create(model=model, max_tokens=120,
+                                  messages=[{"role": "user", "content": prompt}])
     text = "".join(getattr(b, "text", "") for b in resp.content)
     m = re.search(r"\{[^{}]*\}", text, re.S)   # first flat JSON object (robust to extra text)
     try:

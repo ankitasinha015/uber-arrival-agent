@@ -172,6 +172,25 @@ def _match_cuisine(categories: list[str], pref: list[str] | None = None) -> str 
     return None
 
 
+def _cuisine_of(name: str, categories: list[str], pref: list[str] | None = None) -> str | None:
+    """Which of the traveler's taste cuisines this place is, or None. Uses the ChromaDB
+    confidence-gated vector classifier when available — it generalises past the
+    hand-written aliases (handles French/German/sushi they never covered) and returns
+    None on ambiguous places (Korean BBQ, sushi) instead of forcing a weak match. Falls
+    back to the regex aliases when Chroma/model is off (tests, plain imports). The
+    classifier only fires above a calibrated threshold, so anything it names is at least
+    as well-supported as an alias hit — the cuisine_match evaluator stays a valid check."""
+    pref = pref or _UBER_EATS_PREF
+    if _CHROMA:
+        try:
+            from arrival_agent.web import chroma_store
+            cz, _ = chroma_store.classify_cuisine(name, categories, pref)
+            return cz
+        except Exception:
+            pass
+    return _match_cuisine(categories, pref)
+
+
 def _cuisine_label(categories: list[str]) -> str:
     """A short cuisine label for display — strip Foursquare's 'Restaurant' noise."""
     if not categories:
@@ -225,8 +244,13 @@ def _arrival_design(candidates, context):
     Proximity gates first — we only taste-rank places that are actually near, so a
     favourite cuisine 1.8 km away never beats a good option two blocks over."""
     pref = context.get("pref") or _UBER_EATS_PREF   # this traveler's cuisine order
+    # Classify each candidate's cuisine ONCE (the vector classifier embeds, so we don't
+    # want to call it twice per place) and reuse it for both ranking and copy.
+    cuis = {id(r): _cuisine_of(r["restaurant_name"], r.get("categories", []), pref)
+            for r in candidates}
+
     def sort_key(r):
-        cuisine = _match_cuisine(r.get("categories", []), pref)
+        cuisine = cuis[id(r)]
         rank = pref.index(cuisine) if cuisine in pref else 99
         return (rank, r.get("distance_m") or 9999)
 
@@ -237,7 +261,7 @@ def _arrival_design(candidates, context):
     options = []
     for i, r in enumerate(ordered[:4]):
         name = r["restaurant_name"]
-        cuisine = _match_cuisine(r.get("categories", []), pref)
+        cuisine = cuis[id(r)]
         label = cuisine or _cuisine_label(r.get("categories", []))
         dist = r.get("distance_m")
         dist_txt = f"{round(dist)} m away" if dist else "near your hotel"
