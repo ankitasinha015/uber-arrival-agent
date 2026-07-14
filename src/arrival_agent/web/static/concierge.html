@@ -308,12 +308,23 @@ function enter(id){
 }
 $('#switch').onclick = showLogin;
 
+let rebootT = null;
 function start(){
   thread.innerHTML = '';
+  clearTimeout(rebootT);
   fetch(`/api/concierge/run?mode=${mode}`, {method:'POST'}).then(r=>r.json()).then(r=>{
     runId = r.run_id;
     if (es) es.close();
+    let ended = false;
     es = new EventSource(`/api/concierge/${runId}/stream`);
+    es.onerror = () => {
+      // stream dropped (e.g. the server restarted). Don't let EventSource
+      // silently reconnect to a stale run — start this traveler fresh so the
+      // data is always current.
+      if (ended || !es) return;
+      es.close(); es = null;
+      if (mode) rebootT = setTimeout(start, 1200);
+    };
     es.addEventListener('context', e => renderCtx(JSON.parse(e.data)));
     es.addEventListener('read', e => { const d = JSON.parse(e.data); el('read', esc(d.text.split('→')[0].trim())); });
     es.addEventListener('agent', e => el('bubble', esc(JSON.parse(e.data).text)));
@@ -332,7 +343,7 @@ function start(){
       if (sent) parts.push('hotel notified');
       el('card done').innerHTML = `<div class="done"><h3>All set.</h3>
         <p>${parts.length ? parts.join(' · ')+'.' : 'Handled what you asked for.'}</p></div>`;
-      es.close();
+      ended = true; es.close();
     });
     es.addEventListener('error', e => { try{ el('bubble', 'Something went wrong: '+esc(JSON.parse(e.data).message)); }catch(_){} });
   });

@@ -14,6 +14,7 @@ recovery) shows on one screen.
 from __future__ import annotations
 
 import asyncio
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
@@ -615,7 +616,13 @@ class ConciergeRegistry:
     def reattach(self, run_id: str) -> ConciergeRun | None:
         """Rebuild a run the in-memory registry lost (server restarted). Returns a
         resume-mode run whose driver replays the event log, then continues from the
-        paused moment persisted in the LangGraph checkpoint. None if unknown."""
+        paused moment persisted in the LangGraph checkpoint. None if unknown.
+
+        OFF by default: replaying a persisted run means an old EventSource that
+        reconnects after a restart would show STALE data. Set ARRIVAL_AGENT_DURABLE=1
+        to enable cross-restart resume (the frontend otherwise just starts fresh)."""
+        if os.environ.get("ARRIVAL_AGENT_DURABLE") != "1":
+            return None
         mode = store.mode_of(run_id)
         if mode is None:
             return None

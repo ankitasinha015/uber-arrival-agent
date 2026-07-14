@@ -54,6 +54,7 @@ def test_auto_notify_moment_runs_to_done_without_a_pause(tmp_path):
 # --- reconnect after a restart: replay the log, resume the paused moment --------
 
 import asyncio  # noqa: E402
+import os  # noqa: E402
 
 from arrival_agent.web import concierge  # noqa: E402
 
@@ -98,6 +99,7 @@ async def _drive_until(run, stop_at):
 
 
 async def _scenario():
+    os.environ["ARRIVAL_AGENT_DURABLE"] = "1"   # enable cross-restart resume for this test
     concierge._GEO_MEMO[concierge._loc("priya")["hotel_address"]] = list(_FIXED)
 
     # run part-way, then stop at the dinner pick WITHOUT answering it
