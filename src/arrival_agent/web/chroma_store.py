@@ -143,6 +143,17 @@ def taste_for(tid: str) -> list[str]:
     return [cz for cz, _ in counts.most_common()]
 
 
+def top_dish(tid: str, cuisine: str) -> str | None:
+    """The traveler's most-ordered DISH in a cuisine, from their Chroma order
+    history — used to explain a suggestion ('you order Double Cheeseburgers')."""
+    got = client().get_or_create_collection("eats_orders").get(
+        where={"$and": [{"traveler": tid}, {"cuisine": cuisine}]}, include=["metadatas"]
+    )
+    dishes = Counter(m.get("dish") for m in (got.get("metadatas", []) or []) if m.get("dish"))
+    top = dishes.most_common(1)
+    return top[0][0] if top else None
+
+
 def inventory() -> tuple[dict, list[dict]]:
     """Everything currently in the store: (travelers dict, list of eats orders).
     Used to show exactly what synthetic data exists."""

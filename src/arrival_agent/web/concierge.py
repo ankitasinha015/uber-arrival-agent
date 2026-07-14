@@ -186,6 +186,20 @@ def _arrival_find(context):
 _NEAR_M = 1500  # keep dinner genuinely close; taste never drags us far from the hotel
 
 
+def _order_history_dish(tid: str | None, cuisine: str) -> str:
+    """The traveler's most-ordered dish in a cuisine — pulled from their Uber Eats
+    order history in Chroma when available, else the static synthetic map."""
+    if _CHROMA and tid:
+        try:
+            from arrival_agent.web import chroma_store
+            d = chroma_store.top_dish(tid, cuisine)
+            if d:
+                return d
+        except Exception:
+            pass
+    return _MOST_ORDERED_DISH.get(cuisine, "the house special")
+
+
 def _arrival_design(candidates, context):
     """Take what's actually open near the hotel (live geo) and rank it by the
     cuisines the traveler orders most on Uber Eats. The match is taste↔location:
@@ -213,14 +227,18 @@ def _arrival_design(candidates, context):
         matched = cuisine is not None
 
         top_match = i == 0 and matched
+        is_top_cuisine = bool(pref) and cuisine == pref[0]   # their #1 overall?
         if matched:
-            dish = _MOST_ORDERED_DISH.get(cuisine, "the house special")
-            if top_match:
+            dish = _order_history_dish(context.get("traveler_id"), cuisine)
+            if top_match and is_top_cuisine:
                 why = f"you order {cuisine.lower()} most on Uber Eats — {dist_txt}"
+            elif top_match:
+                # their #1 cuisine isn't open nearby — this is the best available match
+                why = f"closest to your taste that's open near your hotel — you order {cuisine.lower()} a lot — {dist_txt}"
             else:
                 why = f"{cuisine} · a cuisine you order often — {dist_txt}"
-            # taste-honest, dish-first: this is YOUR most-ordered dish in this cuisine
-            pitch = (f"Your most-ordered {cuisine.lower()} on Uber Eats is the {dish} — "
+            # dish-honest: this is YOUR most-ordered dish WITHIN this cuisine
+            pitch = (f"Your go-to {cuisine.lower()} order is the {dish} — "
                      f"I can get it from {name} and send it to your room.")
         else:
             dish = "the house special"
@@ -573,6 +591,7 @@ def _context(mode: str = "new") -> dict:
     arrival_hhmm = _arrival_str(mode)
     ctx = {"arrival_hhmm": arrival_hhmm, "city": loc["hotel"], "deliver_at": _DELIVER,
            "hotel_address": loc["hotel_address"],   # where the geo tool searches
+           "traveler_id": mode,                     # for Chroma order-history lookups
            "currency": loc["currency"], "city_name": loc["city"],
            "time_of_day": f"{_ARRIVAL:%H:%M} (room arrival estimate)",
            "fatigue": "high late-night arrival after a flight",
