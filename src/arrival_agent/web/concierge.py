@@ -326,6 +326,14 @@ def _trip_extras(mode: str):
     return p.get("bookings", []), p.get("flag")
 
 
+def _uber_ride(mode: str):
+    """The traveler's booked Uber ride, if any — used to hand off to live tracking
+    once they land."""
+    bookings, _ = _trip_extras(mode)
+    return next((b for b in bookings
+                 if b.get("accent") == "uber" or "Uber" in b.get("name", "")), None)
+
+
 def _signals_for(mode: str) -> dict:
     if mode in _PERSONAS:
         return _PERSONAS[mode]["signals"]
@@ -631,6 +639,14 @@ async def drive(run: ConciergeRun) -> None:
                 await run.queue.put(("read", {"text": actions.read, "intensity": actions.intensity}))
             for line in (intro if isinstance(intro, list) else [intro]):
                 await run.queue.put(("agent", {"text": line}))
+            # landed with a booked Uber → hand off to live tracking in the app
+            if actions.moment == Moment.ARRIVAL:
+                ride = _uber_ride(run.mode)
+                if ride:
+                    await run.queue.put(("track", {
+                        "confirm": ride.get("confirm"), "at": ride.get("at"),
+                        "url": "https://m.uber.com/",
+                    }))
             controller = TripController(actions, _handlers(run.mode), _context(run.mode))
             step = await asyncio.to_thread(controller.start)
             while isinstance(step, Pause):

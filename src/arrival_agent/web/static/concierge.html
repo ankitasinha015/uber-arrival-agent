@@ -84,6 +84,10 @@ ul.synced li{margin:3px 0} ul.synced b{color:var(--ink);font-weight:600}
 .card.ride{background:#111;border-color:#111;color:#fff}
 .card.ride .ride-badge{color:#5ef0a6;background:rgba(94,240,166,.12);border-color:rgba(94,240,166,.3)}
 .card.ride .ride-meta{color:#c9c9c9} .card.ride .ride-meta b{color:#fff}
+.ride-badge.live{color:#5ef0a6}
+.btn.track{display:inline-block;margin-top:11px;background:#fff;color:#111;border:1px solid #fff;
+  padding:9px 14px;border-radius:9px;font-size:12.5px;font-weight:600;text-decoration:none}
+.btn.track:hover{background:#eee}
 .read{align-self:center;font-family:var(--mono);font-size:10px;color:var(--ink-faint);
   background:var(--bg);border:1px dashed var(--rule-soft);border-radius:6px;padding:3px 9px;letter-spacing:.2px}
 /* login / traveler select */
@@ -235,6 +239,13 @@ function renderConfirm(d){
     + (d.at ? `<div class="ride-at">${esc(d.at)}</div>` : '')
     + `<div class="ride-meta">${esc(d.did)}${d.confirm ? ' · confirmation <b>'+esc(d.confirm)+'</b>' : ''}</div>`;
 }
+function renderTrack(d){
+  const c = el('card ride');
+  c.innerHTML = `<div class="ride-h"><span>🚗 Your Uber is on the way</span><span class="ride-badge live">● live</span></div>`
+    + `<div class="ride-meta" style="margin-top:6px">You've landed — the driver's heading to arrivals.`
+    + `${d.at ? ' '+esc(d.at)+'.' : ''}${d.confirm ? ' · conf <b>'+esc(d.confirm)+'</b>' : ''}</div>`
+    + `<a class="btn track" href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">Track your ride in the Uber app →</a>`;
+}
 function renderSynced(d){
   const c = el('card acted');
   const items = d.items || [];
@@ -308,6 +319,7 @@ function start(){
     es.addEventListener('agent', e => el('bubble', esc(JSON.parse(e.data).text)));
     es.addEventListener('acted', e => renderActed(JSON.parse(e.data)));
     es.addEventListener('confirm', e => renderConfirm(JSON.parse(e.data)));
+    es.addEventListener('track', e => renderTrack(JSON.parse(e.data)));
     es.addEventListener('synced', e => renderSynced(JSON.parse(e.data)));
     es.addEventListener('todo', e => renderTodo(JSON.parse(e.data)));
     es.addEventListener('you', e => { const d = JSON.parse(e.data); el('you', esc(d.text || VERB[d.decision] || d.decision)); });
