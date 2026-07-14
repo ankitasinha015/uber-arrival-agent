@@ -149,20 +149,25 @@ def taste_for(tid: str) -> list[str]:
 # greedy regex aliases (which mis-bucketed Korean BBQ as American); the RAG eval showed
 # the vector store hedges on ambiguous cuisines (Korean BBQ → ~0.37), so a threshold
 # rejects them cleanly.
+# Exemplars are deliberately kept to words that ONLY the target cuisine uses. The
+# synthetic stress-test (evals/classifier_eval.py) caught cross-cuisine leakage from
+# loose exemplars — "french BISTRO" hit an "american bistro" exemplar, "CURRY leaf"
+# (Indian) hit a Thai "green curry" exemplar — so those tokens are dropped.
 _CUISINE_EXEMPLARS = {
     "Ramen": ["ramen restaurant", "japanese ramen noodle house", "tonkotsu ramen shop"],
     "Mexican": ["mexican restaurant", "taqueria tacos burritos", "tex-mex cantina"],
-    "Thai": ["thai restaurant", "pad thai green curry noodles"],
+    "Thai": ["thai restaurant", "pad thai noodles", "thai basil stir fry"],
     "Burger": ["burger joint", "cheeseburger fast food", "smashburger shack"],
-    "American": ["american restaurant", "diner comfort food", "new american bistro"],
-    "Pizza": ["pizzeria", "italian pizza restaurant", "neapolitan pizza"],
+    "American": ["american restaurant", "classic diner comfort food", "steakhouse and grill"],
+    "Pizza": ["pizzeria", "pepperoni pizza", "neapolitan pizza pie"],
 }
 _exemplar_vecs = None
-# Calibrated on clean vs adversarial restaurants: confident correct matches score
-# 0.72–0.81 (Shake Shack→Burger, Ippudo→Ramen, Los Tacos→Mexican); every ambiguous
-# case falls ≤0.56 (Korean BBQ→0.55, sushi→0.56, German→0.53, French→0.47). 0.60
-# sits in the clean gap — confident matches pass, everything ambiguous → None (honest).
-CLASSIFY_THRESHOLD = 0.60
+# Calibrated, then re-tuned against a 40-case synthetic stress-test. At 0.60 the store
+# false-matched out-of-set cuisines (French→American 0.645, Indian→Thai 0.62). 0.65
+# rejects those while keeping the confident, explicitly-labeled matches (0.72–0.81).
+# The cost is recall on vaguely-labeled places ("Restaurant", "Noodle House") → None;
+# that's the intended honesty-first trade (see evals/synthetic/CLASSIFIER_EVAL.md).
+CLASSIFY_THRESHOLD = 0.65
 
 
 def _cuisine_exemplars():
