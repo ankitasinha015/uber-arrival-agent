@@ -118,12 +118,25 @@ same db file**, and it resumes from disk (`Command(resume=…)`) to the identica
 outcome. That's the crash-recovery the comparison below argues LangGraph is
 *for*, now demonstrated end to end rather than latent.
 
+**The browser reattaches after a restart, too.** Durable *controller* state isn't
+enough — the browser also has to find its trip again. So a small SQLite store
+(`web/concierge_store.py`) records `run_id → mode` and an append-only **event
+log**. On reconnect to a run the in-memory registry lost (process restarted), the
+web layer (`registry.reattach`) rebuilds the run, **replays the event log** to
+redraw the conversation, then continues from the moment still paused in the
+LangGraph checkpoint — skipping already-finished moments (detected via
+`graph.get_state`). Proven with an actual two-process restart: server 1 pauses a
+trip and is killed; a **fresh server process** reattaches, replays the thread, and
+drives it to completion (`test_concierge_langgraph_web.py`, plus a live HTTP
+restart).
+
 Replay-safety in practice: the node re-runs on every resume, so the live
 restaurant lookup is **memoized per hotel** (`concierge._arrival_find`) — the
 choice set is identical across replays and a resumed pick still resolves. The one
-honest boundary: a true multi-process restart needs the choice set frozen at
-decision time (the record/replay cache does this); the in-process memo covers the
-common case and the same-process "restart" the test simulates.
+residual caveat: resuming *exactly* mid-dinner-pick across a **process** restart
+would want the choice set frozen at decision time (the record/replay cache does
+this), since a fresh process re-fetches live geo; pausing anywhere else resumes
+cleanly cross-process, as the live restart test shows.
 
 That makes the finding from the arrival-agent comparison sharper, not weaker.
 Because the loop is fully extracted from the framework:

@@ -35,6 +35,7 @@ from arrival_agent.core.tools import orders as orders_mod
 from arrival_agent.core.tools import restaurants as restaurants_mod
 from arrival_agent.core.tools.email import send_hotel_note
 from arrival_agent.core.domain.recovery import recover_from_rejection
+from arrival_agent.web import concierge_store as store
 
 _CLOSE = object()
 _HOTEL = "Hotel Zephyr, San Francisco"  # display name (notes, welcome copy)
@@ -560,6 +561,8 @@ class ConciergeRun:
     started: bool = False
     awaiting: bool = False
     current: dict | None = None  # the pause payload the user is answering (for say())
+    seq: int = 0                 # event counter — persisted, so reconnect can replay
+    resume: bool = False         # reattached after a restart; replay log then continue
 
 
 class ConciergeRegistry:
@@ -574,6 +577,21 @@ class ConciergeRegistry:
             run_id=uuid4().hex[:12], segments=_segments(memory, mode), mode=mode
         )
         self._runs[run.run_id] = run
+        store.record_run(run.run_id, mode)   # so a restarted server can rebuild it
+        return run
+
+    def reattach(self, run_id: str) -> ConciergeRun | None:
+        """Rebuild a run the in-memory registry lost (server restarted). Returns a
+        resume-mode run whose driver replays the event log, then continues from the
+        paused moment persisted in the LangGraph checkpoint. None if unknown."""
+        mode = store.mode_of(run_id)
+        if mode is None:
+            return None
+        memory = seed_seasoned() if _is_seasoned(mode) else None
+        run = ConciergeRun(
+            run_id=run_id, segments=_segments(memory, mode), mode=mode, resume=True
+        )
+        self._runs[run_id] = run
         return run
 
     def get(self, run_id: str) -> ConciergeRun | None:
@@ -619,91 +637,153 @@ def _acted_payload(v: dict) -> dict:
     return {"text": text, "note": v.get("note")}
 
 
+async def _emit(run: ConciergeRun, kind: str, payload: dict) -> None:
+    """Stream an event to the browser AND persist it, so a reconnect after a
+    server restart can replay the exact thread."""
+    run.seq += 1
+    store.append(run.run_id, run.seq, kind, payload)
+    await run.queue.put((kind, payload))
+
+
+def _is_complete(snap) -> bool:
+    return bool(snap.created_at) and not snap.next and "outcomes" in (snap.values or {})
+
+
+def _pending_pause(snap) -> dict | None:
+    for t in (snap.tasks or ()):
+        for it in (getattr(t, "interrupts", None) or ()):
+            return it.value
+    return None
+
+
 async def drive(run: ConciergeRun) -> None:
-    """Walk the trip's moments in order. Each moment gets its own controller — one
-    engine, many moments — streaming agent turns and pauses to the browser."""
+    """Walk the trip's moments in order, driving each through the LangGraph graph.
+    On `run.resume` (reattached after a server restart), first replay the persisted
+    event log to rebuild the browser thread, then continue from the moment still
+    paused in the checkpoint — skipping already-finished moments."""
     loop = asyncio.get_running_loop()
     if run.queue is None:
         run.queue = asyncio.Queue()
+    from arrival_agent.web import concierge_graph as cg   # lazy: avoids import cycle
+
     outcomes: list[dict] = []
     synced = False
-    announced = False   # has the disruption (delay/change) been surfaced yet?
-    from arrival_agent.web import concierge_graph as cg   # lazy: avoids import cycle
+    announced = False        # has the disruption (delay/change) been surfaced yet?
+    catching_up = run.resume  # still replaying / skipping finished moments?
+
     try:
-        await run.queue.put(("context", _trip_context(run.mode)))
+        if run.resume:   # rebuild the thread the browser lost, straight from the log
+            replayed = store.events_of(run.run_id)
+            for kind, payload in replayed:
+                await run.queue.put((kind, payload))
+            run.seq = len(replayed)
+        else:
+            await _emit(run, "context", _trip_context(run.mode))
+
         for seg_index, (intro, actions) in enumerate(run.segments):
             if actions.moment == Moment.DELAY:   # the gate/change announcement lives here
                 announced = True
-            # before the arrival welcome, sync the rest of the trip's bookings —
-            # each traveler has a different one (meet-&-greet / rental / Uber /
-            # dinner reservation). Fires once, only on a disruption.
-            if not synced and actions.moment == Moment.ARRIVAL:
-                bookings, flag = _trip_extras(run.mode)
-                if bookings:
-                    synced = True
-                    if announced:
-                        lead = ("I also took care of the other bookings on this trip that "
-                                "move with your arrival:")
-                    else:
-                        # nothing surfaced the disruption yet (e.g. a seasoned traveler whose
-                        # hotel beat was memory-trimmed) — lead with it here.
-                        fc = _PERSONAS.get(run.mode, {}).get("flight_change")
-                        delay = _signals_for(run.mode).get("delay_min", 0)
-                        if fc:
-                            lead = ("Your flight was changed — I re-synced the bookings tied "
-                                    "to your new arrival:")
-                        else:
-                            lead = (f"Heads-up: your flight's running about {delay} min late. "
-                                    f"I re-synced the bookings tied to your new arrival:")
-                    await run.queue.put(("agent", {"text": lead}))
-                    primary = [b for b in bookings if b.get("primary") or b.get("at")]
-                    rest = [b for b in bookings if b not in primary]
-                    for b in primary:               # its own confirmed-booking card
-                        await run.queue.put(("confirm", b))
-                    if rest or flag:
-                        await run.queue.put(("synced", {"items": rest, "flag": flag}))
-            if getattr(actions, "read", ""):   # show the signals -> verdict (data flow)
-                await run.queue.put(("read", {"text": actions.read, "intensity": actions.intensity}))
-            for line in (intro if isinstance(intro, list) else [intro]):
-                await run.queue.put(("agent", {"text": line}))
-            # landed with a booked Uber → hand off to live tracking in the app
-            if actions.moment == Moment.ARRIVAL:
-                ride = _uber_ride(run.mode)
-                if ride:
-                    await run.queue.put(("track", {
-                        "confirm": ride.get("confirm"), "at": ride.get("at"),
-                        "url": "https://m.uber.com/",
-                    }))
-            # Drive this moment's controller through the LangGraph StateGraph +
-            # SQLite checkpointer. Each moment is its own thread, so a pause is
-            # persisted to disk and would survive a process restart.
+
             config = {"configurable": {"thread_id": f"{run.run_id}:{seg_index}"}}
-            result = await asyncio.to_thread(
-                cg.graph.invoke, {"mode": run.mode, "seg": seg_index}, config)
+            pending: dict | None = None
+            skip_pre = False
+            if catching_up:
+                snap = cg.graph.get_state(config)
+                if _is_complete(snap):          # finished before the restart — skip it
+                    outcomes.extend(snap.values.get("outcomes", []))
+                    continue
+                catching_up = False             # this is the moment to resume/continue from
+                pending = _pending_pause(snap)
+                skip_pre = pending is not None  # its pre-events were already replayed
+
+            # --- pre-emission (skipped when resuming an already-shown pause) ---
+            if not skip_pre:
+                # before the arrival welcome, sync the rest of the trip's bookings —
+                # each traveler has a different one (meet-&-greet / rental / Uber /
+                # dinner reservation). Fires once, only on a disruption.
+                if not synced and actions.moment == Moment.ARRIVAL:
+                    bookings, flag = _trip_extras(run.mode)
+                    if bookings:
+                        synced = True
+                        if announced:
+                            lead = ("I also took care of the other bookings on this trip that "
+                                    "move with your arrival:")
+                        else:
+                            # nothing surfaced the disruption yet (a seasoned traveler whose
+                            # hotel beat was memory-trimmed) — lead with it here.
+                            fc = _PERSONAS.get(run.mode, {}).get("flight_change")
+                            delay = _signals_for(run.mode).get("delay_min", 0)
+                            if fc:
+                                lead = ("Your flight was changed — I re-synced the bookings tied "
+                                        "to your new arrival:")
+                            else:
+                                lead = (f"Heads-up: your flight's running about {delay} min late. "
+                                        f"I re-synced the bookings tied to your new arrival:")
+                        await _emit(run, "agent", {"text": lead})
+                        primary = [b for b in bookings if b.get("primary") or b.get("at")]
+                        rest = [b for b in bookings if b not in primary]
+                        for b in primary:               # its own confirmed-booking card
+                            await _emit(run, "confirm", b)
+                        if rest or flag:
+                            await _emit(run, "synced", {"items": rest, "flag": flag})
+                if getattr(actions, "read", ""):   # show the signals -> verdict (data flow)
+                    await _emit(run, "read", {"text": actions.read, "intensity": actions.intensity})
+                for line in (intro if isinstance(intro, list) else [intro]):
+                    await _emit(run, "agent", {"text": line})
+                # landed with a booked Uber → hand off to live tracking in the app
+                if actions.moment == Moment.ARRIVAL:
+                    ride = _uber_ride(run.mode)
+                    if ride:
+                        await _emit(run, "track", {
+                            "confirm": ride.get("confirm"), "at": ride.get("at"),
+                            "url": "https://m.uber.com/",
+                        })
+
+            # --- drive this moment through the LangGraph StateGraph + SQLite ---
+            if pending is not None:
+                # the todo was already replayed; re-arm the await and resume the graph
+                run.response = loop.create_future()
+                run.awaiting = True
+                run.current = pending
+                user_input = await run.response
+                run.awaiting = False
+                run.current = None
+                await _emit(run, "you", {
+                    "action_id": pending["action_id"],
+                    "decision": user_input.get("decision"),
+                    "text": user_input.get("text"),
+                })
+                result = await asyncio.to_thread(
+                    cg.graph.invoke, cg.Command(resume=user_input), config)
+            else:
+                result = await asyncio.to_thread(
+                    cg.graph.invoke, {"mode": run.mode, "seg": seg_index}, config)
+
             while result.get("__interrupt__"):
                 intr = result["__interrupt__"]
                 pause = intr[0].value if isinstance(intr, (list, tuple)) else intr.value
-                await run.queue.put(("todo", pause))
+                await _emit(run, "todo", pause)
                 run.response = loop.create_future()
                 run.awaiting = True
                 run.current = pause
                 user_input = await run.response
                 run.awaiting = False
                 run.current = None
-                await run.queue.put(("you", {
+                await _emit(run, "you", {
                     "action_id": pause["action_id"],
                     "decision": user_input.get("decision"),
                     "text": user_input.get("text"),
-                }))
+                })
                 result = await asyncio.to_thread(
                     cg.graph.invoke, cg.Command(resume=user_input), config)
+
             seg_outcomes = result.get("outcomes", [])
             for oc in seg_outcomes:   # the agent auto-acted (no approval) — report back
                 v = oc.get("outcome")
                 if isinstance(v, dict) and v.get("auto") and v.get("sent"):
-                    await run.queue.put(("acted", _acted_payload(v)))
+                    await _emit(run, "acted", _acted_payload(v))
             outcomes.extend(seg_outcomes)  # moment finished
-        await run.queue.put(("done", {"outcomes": outcomes}))
+        await _emit(run, "done", {"outcomes": outcomes})
     except Exception as e:  # never hang the stream
         await run.queue.put(("error", {"message": f"{type(e).__name__}: {e}"}))
     finally:

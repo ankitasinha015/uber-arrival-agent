@@ -141,6 +141,10 @@ def concierge_run(mode: str = "new"):
 async def concierge_stream(run_id: str):
     run = concierge.registry.get(run_id)
     if run is None:
+        # server may have restarted — rebuild the run from its persisted metadata
+        # and resume (replay the event log, continue from the paused moment).
+        run = concierge.registry.reattach(run_id)
+    if run is None:
         return JSONResponse({"error": "unknown run"}, status_code=404)
 
     async def gen():

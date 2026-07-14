@@ -49,3 +49,81 @@ def test_auto_notify_moment_runs_to_done_without_a_pause(tmp_path):
     assert "__interrupt__" not in r
     assert r["outcomes"][-1]["outcome"]["sent"] is True
     c.close()
+
+
+# --- reconnect after a restart: replay the log, resume the paused moment --------
+
+import asyncio  # noqa: E402
+
+from arrival_agent.web import concierge  # noqa: E402
+
+# fixed restaurants so the dinner moment is deterministic + network-free
+_FIXED = [
+    {"restaurant_id": "t1", "restaurant_name": "Ramen House", "categories": ["Ramen Restaurant"], "distance_m": 200},
+    {"restaurant_id": "t2", "restaurant_name": "Taco Spot", "categories": ["Mexican Restaurant"], "distance_m": 300},
+    {"restaurant_id": "t3", "restaurant_name": "Burg", "categories": ["Burger Joint"], "distance_m": 400},
+]
+
+
+def _answer(pause: dict) -> dict:
+    k = pause["kind"]
+    if k == "pick":
+        return {"decision": "pick", "option_id": pause["payload"]["options"][0]["option_id"]}
+    return {"snooze": {"decision": "snooze"}, "confirm_dish": {"decision": "confirm"},
+            "ask_hotel": {"decision": "no"}}.get(k, {"decision": "decline"})
+
+
+async def _drive_until(run, stop_at):
+    """Drive `run`, answering each pause, until a `stop_at` pause (left unanswered)
+    or the stream closes. Returns (task, event kinds seen, closed?)."""
+    run.queue = asyncio.Queue()
+    task = asyncio.create_task(concierge.drive(run))
+    kinds = []
+    while True:
+        kind, payload = await run.queue.get()
+        if kind is concierge._CLOSE:
+            return task, kinds, True
+        kinds.append(kind)
+        if kind == "todo":
+            if payload["kind"] == stop_at:
+                return task, kinds, False
+            aid = payload["action_id"]
+            for _ in range(4000):   # wait until the driver is awaiting THIS pause
+                cur = run.current
+                if run.awaiting and isinstance(cur, dict) and cur.get("action_id") == aid \
+                        and run.response and not run.response.done():
+                    concierge.registry.submit(run.run_id, _answer(payload))
+                    break
+                await asyncio.sleep(0)
+
+
+async def _scenario():
+    concierge._GEO_MEMO[concierge._loc("priya")["hotel_address"]] = list(_FIXED)
+
+    # run part-way, then stop at the dinner pick WITHOUT answering it
+    run1 = concierge.registry.create("priya")
+    task1, _, closed = await _drive_until(run1, stop_at="pick")
+    assert not closed, "expected to reach the dinner pick"
+
+    # simulate a crash: cancel the driver and forget the run in memory
+    task1.cancel()
+    try:
+        await task1
+    except asyncio.CancelledError:
+        pass
+    concierge.registry.discard(run1.run_id)
+    assert concierge.registry.get(run1.run_id) is None
+
+    # RESTART: reattach from persisted metadata, resume to completion
+    run2 = concierge.registry.reattach(run1.run_id)
+    assert run2 is not None and run2.resume
+    task2, kinds2, _ = await _drive_until(run2, stop_at=None)
+    await task2
+    return kinds2
+
+
+def test_reconnect_after_restart_replays_and_resumes():
+    kinds = asyncio.run(_scenario())
+    assert "context" in kinds        # the thread head was replayed from the log
+    assert kinds.count("todo") >= 1  # the paused pick was resumed and answered
+    assert kinds[-1] == "done"       # the trip ran to completion after the restart
