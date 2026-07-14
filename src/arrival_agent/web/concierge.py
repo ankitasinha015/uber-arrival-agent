@@ -256,8 +256,9 @@ _PERSONAS = {
                "hotel_address": "The Langham, 330 N Wabash Ave, Chicago, IL 60611",
                "flight": "UA 512", "route": "EWR → ORD",
                "bookings": [
-                   {"name": "Uber Reserve — airport pickup", "did": "moved your pickup to match the new landing time",
-                    "confirm": "UBR-7A93", "at": "meets you at arrivals ~1:50 AM"},
+                   {"name": "Meet & Greet — airport assist (ORD)", "icon": "🧑‍✈️", "primary": True,
+                    "did": "updated your greeter with the new arrival",
+                    "confirm": "MG-3307", "at": "greeter meets you at the gate with a nameboard"},
                ],
                "signals": {"delay_min": 45, "arrival_hour": 1,  "security_wait_min": 45, "pre_flight_min": 120, "security_fresh": True}},
     "marcus": {"name": "Marcus Boyd",    "tag": "Road warrior",      "initial": "M", "seasoned": True,
@@ -265,6 +266,11 @@ _PERSONAS = {
                "city": "New York", "hotel": "The New Yorker, New York", "currency": "$",
                "hotel_address": "The New Yorker Hotel, 481 8th Ave, New York, NY 10001",
                "flight": "DL 208", "route": "SFO → JFK",
+               "bookings": [
+                   {"name": "Hertz rental car (JFK)", "icon": "🚙", "primary": True,
+                    "did": "held the car and told the counter you'll collect later",
+                    "confirm": "HZ-88410", "at": "counter holds your car until you arrive"},
+               ],
                "signals": {"delay_min": 45, "arrival_hour": 1,  "security_wait_min": 45, "pre_flight_min": 120, "security_fresh": True}},
     "olivia": {"name": "Olivia Chen",    "tag": "On-time optimist",  "initial": "O", "seasoned": False,
                "taste": ["Mexican", "Pizza", "American", "Burger", "Thai", "Ramen"],
@@ -280,12 +286,9 @@ _PERSONAS = {
                # the airline rebooked him onto a different flight — a change, not just a delay
                "flight_change": {"to_flight": "UA 892", "new_arrival": "2:40 AM", "delta": "about 90 min later"},
                "bookings": [
-                   {"name": "Uber Reserve — airport pickup", "did": "rebooked your pickup for the new landing time",
+                   {"name": "Uber Reserve — airport pickup", "icon": "🚗", "primary": True, "accent": "uber",
+                    "did": "rebooked your pickup for the new landing time",
                     "confirm": "UBR-4C21", "at": "meets you at arrivals ~3:15 AM"},
-                   {"name": "Meet & Assist porter (SFO)", "did": "updated your arrival with the porter desk",
-                    "confirm": "MA-1180"},
-                   {"name": "Hertz rental car", "did": "told the counter you'll collect later — reservation held",
-                    "confirm": "HZ-55207"},
                ],
                "flag": {"name": "8:00 AM team standup", "note": "you now land at 2:40 AM — that's a rough morning. Want me to ask the organizer to push it?"},
                "signals": {"delay_min": 90, "arrival_hour": 2,  "security_wait_min": 30, "pre_flight_min": 120, "security_fresh": True}},
@@ -295,10 +298,9 @@ _PERSONAS = {
                "hotel_address": "Hotel Zoo Berlin, Kurfürstendamm 25, 10719 Berlin, Germany",
                "flight": "LH 435", "route": "JFK → BER",
                "bookings": [
-                   {"name": "Uber Reserve — airport pickup", "did": "moved your pickup to the new arrival time",
-                    "confirm": "UBR-2F08", "at": "meets you at arrivals ~1:50 AM"},
-                   {"name": "Gepäckträger (porter) at BER", "did": "updated your arrival time",
-                    "confirm": "MA-3391"},
+                   {"name": "Dinner reservation — Lokal, Mitte", "icon": "🍽️", "primary": True,
+                    "did": "released the 9:00 PM table — you'll land too late; I'll sort delivery to your room instead",
+                    "confirm": "RES-2291", "at": "table released · switching to Uber Eats delivery"},
                ],
                "signals": {"delay_min": 20, "arrival_hour": 23, "security_wait_min": 12, "pre_flight_min": 120, "security_fresh": True}},
 }
@@ -609,6 +611,22 @@ async def drive(run: ConciergeRun) -> None:
     try:
         await run.queue.put(("context", _trip_context(run.mode)))
         for intro, actions in run.segments:
+            # before the arrival welcome, sync the rest of the trip's bookings —
+            # each traveler has a different one (meet-&-greet / rental / Uber /
+            # dinner reservation). Fires once, only on a disruption.
+            if not synced and actions.moment == Moment.ARRIVAL:
+                bookings, flag = _trip_extras(run.mode)
+                if bookings:
+                    synced = True
+                    await run.queue.put(("agent", {"text":
+                        "I also took care of the other bookings on this trip that move "
+                        "with your arrival:"}))
+                    primary = [b for b in bookings if b.get("primary") or b.get("at")]
+                    rest = [b for b in bookings if b not in primary]
+                    for b in primary:               # its own confirmed-booking card
+                        await run.queue.put(("confirm", b))
+                    if rest or flag:
+                        await run.queue.put(("synced", {"items": rest, "flag": flag}))
             if getattr(actions, "read", ""):   # show the signals -> verdict (data flow)
                 await run.queue.put(("read", {"text": actions.read, "intensity": actions.intensity}))
             for line in (intro if isinstance(intro, list) else [intro]):
@@ -634,23 +652,6 @@ async def drive(run: ConciergeRun) -> None:
                 if isinstance(v, dict) and v.get("auto") and v.get("sent"):
                     await run.queue.put(("acted", _acted_payload(v)))
             outcomes.extend(step.outcomes)  # step is Done for this moment
-
-            # after the hotel (DELAY) beat on a disruption, sync the REST of the
-            # trip — the other bookings tied to the arrival time.
-            if not synced and actions.moment == Moment.DELAY:
-                bookings, flag = _trip_extras(run.mode)
-                if bookings:
-                    synced = True
-                    await run.queue.put(("agent", {"text":
-                        "While I'm at it — I checked everything else on this trip that "
-                        "moves with your arrival:"}))
-                    # the Uber ride gets its own booking-confirmed notification
-                    ride = next((b for b in bookings if "Uber" in b["name"]), None)
-                    others = [b for b in bookings if b is not ride]
-                    if ride:
-                        await run.queue.put(("ride", ride))
-                    if others or flag:
-                        await run.queue.put(("synced", {"items": others, "flag": flag}))
         await run.queue.put(("done", {"outcomes": outcomes}))
     except Exception as e:  # never hang the stream
         await run.queue.put(("error", {"message": f"{type(e).__name__}: {e}"}))
