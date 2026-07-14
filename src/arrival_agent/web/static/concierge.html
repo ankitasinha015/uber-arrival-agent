@@ -68,7 +68,11 @@ body{margin:0;background:var(--bg);font-family:var(--sans);color:var(--ink);
 .dim{opacity:.5;pointer-events:none}
 .card.acted{border-color:#bfe3c8;background:#f6fbf7}
 .card.acted .lead{font-weight:600}
-.note-line{font-size:10.5px;color:var(--ink-faint);margin-top:2px}
+.note-line{font-size:10.5px;color:var(--ink-faint);margin-top:6px}
+ul.synced{margin:7px 0 4px;padding-left:16px;font-size:12.5px;color:var(--ink-soft);line-height:1.5}
+ul.synced li{margin:3px 0} ul.synced b{color:var(--ink);font-weight:600}
+.flag{margin-top:8px;padding:8px 10px;background:#fff7ec;border:1px solid #f2dcae;border-radius:8px;
+  font-size:12px;color:#8a6a2f;line-height:1.4} .flag b{color:#6b4f1c}
 .read{align-self:center;font-family:var(--mono);font-size:10px;color:var(--ink-faint);
   background:var(--bg);border:1px dashed var(--rule-soft);border-radius:6px;padding:3px 9px;letter-spacing:.2px}
 /* login / traveler select */
@@ -212,6 +216,15 @@ function renderActed(d){
     + (d.note ? `<div class="draft">"${esc(d.note)}"</div>` : '')
     + `<div class="note-line">the agent handled this — no approval needed</div>`;
 }
+function renderSynced(d){
+  const c = el('card acted');
+  let h = `<div class="lead">✅ Synced the rest of your trip to the new arrival:</div>`;
+  h += '<ul class="synced">' + (d.items||[]).map(it =>
+        `<li><b>${esc(it.name)}</b> — ${esc(it.did)}</li>`).join('') + '</ul>';
+  if (d.flag) h += `<div class="flag">⚠️ <b>${esc(d.flag.name)}</b> — ${esc(d.flag.note)}</div>`;
+  h += `<div class="note-line">bookings updated automatically · the flagged item is yours to decide</div>`;
+  c.innerHTML = h;
+}
 
 const VERB = {yes:'Yes, tell the hotel', no:"No, I'll handle it", send:'Sent the note', pick:'Picked', confirm:'Order it', back:'Back to options', snooze:'Got it', decline:'No thanks'};
 
@@ -266,6 +279,7 @@ function start(){
     es.addEventListener('read', e => { const d = JSON.parse(e.data); el('read', esc(d.text.split('→')[0].trim())); });
     es.addEventListener('agent', e => el('bubble', esc(JSON.parse(e.data).text)));
     es.addEventListener('acted', e => renderActed(JSON.parse(e.data)));
+    es.addEventListener('synced', e => renderSynced(JSON.parse(e.data)));
     es.addEventListener('todo', e => renderTodo(JSON.parse(e.data)));
     es.addEventListener('you', e => { const d = JSON.parse(e.data); el('you', esc(d.text || VERB[d.decision] || d.decision)); });
     es.addEventListener('done', e => {

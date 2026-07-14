@@ -255,6 +255,9 @@ _PERSONAS = {
                "city": "Chicago", "hotel": "The Langham, Chicago", "currency": "$",
                "hotel_address": "The Langham, 330 N Wabash Ave, Chicago, IL 60611",
                "flight": "UA 512", "route": "EWR → ORD",
+               "bookings": [
+                   {"name": "Uber Reserve — airport pickup", "did": "moved your pickup to match the new landing time"},
+               ],
                "signals": {"delay_min": 45, "arrival_hour": 1,  "security_wait_min": 45, "pre_flight_min": 120, "security_fresh": True}},
     "marcus": {"name": "Marcus Boyd",    "tag": "Road warrior",      "initial": "M", "seasoned": True,
                "taste": ["Burger", "American", "Pizza", "Mexican", "Thai", "Ramen"],
@@ -275,12 +278,22 @@ _PERSONAS = {
                "flight": "UA 517", "route": "EWR → SFO",
                # the airline rebooked him onto a different flight — a change, not just a delay
                "flight_change": {"to_flight": "UA 892", "new_arrival": "2:40 AM", "delta": "about 90 min later"},
+               "bookings": [
+                   {"name": "Uber Reserve — airport pickup", "did": "rebooked your pickup for the new landing time"},
+                   {"name": "Meet & Assist porter (SFO)", "did": "updated your arrival with the porter desk"},
+                   {"name": "Hertz rental car", "did": "told the counter you'll collect later — reservation held"},
+               ],
+               "flag": {"name": "8:00 AM team standup", "note": "you now land at 2:40 AM — that's a rough morning. Want me to ask the organizer to push it?"},
                "signals": {"delay_min": 90, "arrival_hour": 2,  "security_wait_min": 30, "pre_flight_min": 120, "security_fresh": True}},
     "lena":   {"name": "Lena Kowalski",  "tag": "Creature of habit", "initial": "L", "seasoned": False,
                "taste": ["Mexican", "Thai", "Pizza", "American", "Burger", "Ramen"],
                "city": "Berlin", "hotel": "Hotel Zoo, Berlin", "currency": "€",
                "hotel_address": "Hotel Zoo Berlin, Kurfürstendamm 25, 10719 Berlin, Germany",
                "flight": "LH 435", "route": "JFK → BER",
+               "bookings": [
+                   {"name": "Uber Reserve — airport pickup", "did": "moved your pickup to the new arrival time"},
+                   {"name": "Gepäckträger (porter) at BER", "did": "updated your arrival time"},
+               ],
                "signals": {"delay_min": 20, "arrival_hour": 23, "security_wait_min": 12, "pre_flight_min": 120, "security_fresh": True}},
 }
 
@@ -296,6 +309,13 @@ def _loc(mode: str) -> dict:
     if not p:
         return _SF_LOC
     return {k: p[k] for k in ("city", "hotel", "hotel_address", "flight", "route", "currency")}
+
+
+def _trip_extras(mode: str):
+    """Other arrival-coupled bookings the agent syncs on a disruption (Uber ride,
+    porter, rental car…), plus one it flags rather than moves on its own."""
+    p = _PERSONAS.get(mode, {})
+    return p.get("bookings", []), p.get("flag")
 
 
 def _signals_for(mode: str) -> dict:
@@ -579,6 +599,7 @@ async def drive(run: ConciergeRun) -> None:
     if run.queue is None:
         run.queue = asyncio.Queue()
     outcomes: list[dict] = []
+    synced = False
     try:
         await run.queue.put(("context", _trip_context(run.mode)))
         for intro, actions in run.segments:
@@ -607,6 +628,17 @@ async def drive(run: ConciergeRun) -> None:
                 if isinstance(v, dict) and v.get("auto") and v.get("sent"):
                     await run.queue.put(("acted", _acted_payload(v)))
             outcomes.extend(step.outcomes)  # step is Done for this moment
+
+            # after the hotel (DELAY) beat on a disruption, sync the REST of the
+            # trip — the other bookings tied to the arrival time.
+            if not synced and actions.moment == Moment.DELAY:
+                bookings, flag = _trip_extras(run.mode)
+                if bookings:
+                    synced = True
+                    await run.queue.put(("agent", {"text":
+                        "While I'm at it — I checked everything else on this trip that "
+                        "moves with your arrival:"}))
+                    await run.queue.put(("synced", {"items": bookings, "flag": flag}))
         await run.queue.put(("done", {"outcomes": outcomes}))
     except Exception as e:  # never hang the stream
         await run.queue.put(("error", {"message": f"{type(e).__name__}: {e}"}))
