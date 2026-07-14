@@ -44,3 +44,7 @@ serve_local.py
 
 # behaviour memory (per-user counts)
 .memory/
+
+# LangGraph SQLite checkpointer (durable trip state)
+concierge_checkpoints.sqlite
+*.sqlite

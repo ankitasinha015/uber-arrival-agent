@@ -103,6 +103,28 @@ concierge_drivers.py` gives it two drivers and a conformance test
 Both produce the *same pause sequence and the same outcomes*, including through a
 recovery (restaurant offline → re-pause → pick the backup). `raw == LangGraph`.
 
+### The live demo now runs on LangGraph (with durable state)
+
+The running web app is no longer just the raw driver — each moment of a trip is
+driven through `web/concierge_graph.py`, a compiled `StateGraph` whose single
+node loops on a native `interrupt()`, checkpointed by a **`SqliteSaver`** on
+disk. Every pause (pick / send / confirm_dish / snooze) is one interrupt,
+persisted to `concierge_checkpoints.sqlite` under `thread_id = "{run_id}:{seg}"`.
+
+Because the state is on disk, a paused trip is **durable across a process
+restart** — `tests/test_concierge_langgraph_web.py` proves it: drive a moment to
+its pause, throw the graph away, build a **brand-new graph + checkpointer on the
+same db file**, and it resumes from disk (`Command(resume=…)`) to the identical
+outcome. That's the crash-recovery the comparison below argues LangGraph is
+*for*, now demonstrated end to end rather than latent.
+
+Replay-safety in practice: the node re-runs on every resume, so the live
+restaurant lookup is **memoized per hotel** (`concierge._arrival_find`) — the
+choice set is identical across replays and a resumed pick still resolves. The one
+honest boundary: a true multi-process restart needs the choice set frozen at
+decision time (the record/replay cache does this); the in-process memo covers the
+common case and the same-process "restart" the test simulates.
+
 That makes the finding from the arrival-agent comparison sharper, not weaker.
 Because the loop is fully extracted from the framework:
 

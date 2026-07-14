@@ -160,15 +160,25 @@ def _cuisine_label(categories: list[str]) -> str:
     return categories[0].replace(" Restaurant", "").replace(" Place", "").strip() or "Restaurant"
 
 
+_GEO_MEMO: dict[str, list] = {}   # per-hotel, so the choice set is stable across
+
+
 def _arrival_find(context):
     """Real restaurants near THIS traveler's hotel, pulled live from the location
-    API each run. Falls back to a small honest set only if the live call fails."""
+    API. Memoized per hotel so the choice set is identical across LangGraph replay
+    re-runs (the node re-executes on every resume) — otherwise a resumed pick could
+    reference an option a fresh live call didn't return. Falls back to a small
+    honest set only if the live call fails."""
     address = (context or {}).get("hotel_address", _HOTEL_ADDRESS)
+    if address in _GEO_MEMO:
+        return _GEO_MEMO[address]
     try:
         places = restaurants_mod.get_eats_options(address, limit=12)
-        return places or _ARRIVAL_FALLBACK
+        result = list(places) if places else _ARRIVAL_FALLBACK
     except Exception:
-        return _ARRIVAL_FALLBACK
+        result = _ARRIVAL_FALLBACK
+    _GEO_MEMO[address] = result
+    return result
 
 
 _NEAR_M = 1500  # keep dinner genuinely close; taste never drags us far from the hotel
@@ -549,7 +559,7 @@ class ConciergeRun:
     response: asyncio.Future | None = None
     started: bool = False
     awaiting: bool = False
-    current: Pause | None = None  # the pause the user is answering (for say())
+    current: dict | None = None  # the pause payload the user is answering (for say())
 
 
 class ConciergeRegistry:
@@ -582,7 +592,8 @@ class ConciergeRegistry:
         run = self._runs.get(run_id)
         if run is None or not run.awaiting or run.current is None:
             return False
-        return self.submit(run_id, parse_intent(text, run.current.kind))
+        kind = run.current["kind"] if isinstance(run.current, dict) else run.current.kind
+        return self.submit(run_id, parse_intent(text, kind))
 
     def discard(self, run_id: str) -> None:
         self._runs.pop(run_id, None)
@@ -617,9 +628,10 @@ async def drive(run: ConciergeRun) -> None:
     outcomes: list[dict] = []
     synced = False
     announced = False   # has the disruption (delay/change) been surfaced yet?
+    from arrival_agent.web import concierge_graph as cg   # lazy: avoids import cycle
     try:
         await run.queue.put(("context", _trip_context(run.mode)))
-        for intro, actions in run.segments:
+        for seg_index, (intro, actions) in enumerate(run.segments):
             if actions.moment == Moment.DELAY:   # the gate/change announcement lives here
                 announced = True
             # before the arrival welcome, sync the rest of the trip's bookings —
@@ -662,27 +674,35 @@ async def drive(run: ConciergeRun) -> None:
                         "confirm": ride.get("confirm"), "at": ride.get("at"),
                         "url": "https://m.uber.com/",
                     }))
-            controller = TripController(actions, _handlers(run.mode), _context(run.mode))
-            step = await asyncio.to_thread(controller.start)
-            while isinstance(step, Pause):
-                await run.queue.put(("todo", _pause_payload(step)))
+            # Drive this moment's controller through the LangGraph StateGraph +
+            # SQLite checkpointer. Each moment is its own thread, so a pause is
+            # persisted to disk and would survive a process restart.
+            config = {"configurable": {"thread_id": f"{run.run_id}:{seg_index}"}}
+            result = await asyncio.to_thread(
+                cg.graph.invoke, {"mode": run.mode, "seg": seg_index}, config)
+            while result.get("__interrupt__"):
+                intr = result["__interrupt__"]
+                pause = intr[0].value if isinstance(intr, (list, tuple)) else intr.value
+                await run.queue.put(("todo", pause))
                 run.response = loop.create_future()
                 run.awaiting = True
-                run.current = step
+                run.current = pause
                 user_input = await run.response
                 run.awaiting = False
                 run.current = None
                 await run.queue.put(("you", {
-                    "action_id": step.action_id,
+                    "action_id": pause["action_id"],
                     "decision": user_input.get("decision"),
                     "text": user_input.get("text"),
                 }))
-                step = await asyncio.to_thread(controller.respond, user_input)
-            for oc in step.outcomes:   # the agent auto-acted (no approval) — report back
+                result = await asyncio.to_thread(
+                    cg.graph.invoke, cg.Command(resume=user_input), config)
+            seg_outcomes = result.get("outcomes", [])
+            for oc in seg_outcomes:   # the agent auto-acted (no approval) — report back
                 v = oc.get("outcome")
                 if isinstance(v, dict) and v.get("auto") and v.get("sent"):
                     await run.queue.put(("acted", _acted_payload(v)))
-            outcomes.extend(step.outcomes)  # step is Done for this moment
+            outcomes.extend(seg_outcomes)  # moment finished
         await run.queue.put(("done", {"outcomes": outcomes}))
     except Exception as e:  # never hang the stream
         await run.queue.put(("error", {"message": f"{type(e).__name__}: {e}"}))
