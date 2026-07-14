@@ -616,9 +616,12 @@ async def drive(run: ConciergeRun) -> None:
         run.queue = asyncio.Queue()
     outcomes: list[dict] = []
     synced = False
+    announced = False   # has the disruption (delay/change) been surfaced yet?
     try:
         await run.queue.put(("context", _trip_context(run.mode)))
         for intro, actions in run.segments:
+            if actions.moment == Moment.DELAY:   # the gate/change announcement lives here
+                announced = True
             # before the arrival welcome, sync the rest of the trip's bookings —
             # each traveler has a different one (meet-&-greet / rental / Uber /
             # dinner reservation). Fires once, only on a disruption.
@@ -626,9 +629,21 @@ async def drive(run: ConciergeRun) -> None:
                 bookings, flag = _trip_extras(run.mode)
                 if bookings:
                     synced = True
-                    await run.queue.put(("agent", {"text":
-                        "I also took care of the other bookings on this trip that move "
-                        "with your arrival:"}))
+                    if announced:
+                        lead = ("I also took care of the other bookings on this trip that "
+                                "move with your arrival:")
+                    else:
+                        # nothing surfaced the disruption yet (e.g. a seasoned traveler whose
+                        # hotel beat was memory-trimmed) — lead with it here.
+                        fc = _PERSONAS.get(run.mode, {}).get("flight_change")
+                        delay = _signals_for(run.mode).get("delay_min", 0)
+                        if fc:
+                            lead = ("Your flight was changed — I re-synced the bookings tied "
+                                    "to your new arrival:")
+                        else:
+                            lead = (f"Heads-up: your flight's running about {delay} min late. "
+                                    f"I re-synced the bookings tied to your new arrival:")
+                    await run.queue.put(("agent", {"text": lead}))
                     primary = [b for b in bookings if b.get("primary") or b.get("at")]
                     rest = [b for b in bookings if b not in primary]
                     for b in primary:               # its own confirmed-booking card
