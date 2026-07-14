@@ -256,7 +256,8 @@ _PERSONAS = {
                "hotel_address": "The Langham, 330 N Wabash Ave, Chicago, IL 60611",
                "flight": "UA 512", "route": "EWR → ORD",
                "bookings": [
-                   {"name": "Uber Reserve — airport pickup", "did": "moved your pickup to match the new landing time"},
+                   {"name": "Uber Reserve — airport pickup", "did": "moved your pickup to match the new landing time",
+                    "confirm": "UBR-7A93", "at": "meets you at arrivals ~1:50 AM"},
                ],
                "signals": {"delay_min": 45, "arrival_hour": 1,  "security_wait_min": 45, "pre_flight_min": 120, "security_fresh": True}},
     "marcus": {"name": "Marcus Boyd",    "tag": "Road warrior",      "initial": "M", "seasoned": True,
@@ -279,9 +280,12 @@ _PERSONAS = {
                # the airline rebooked him onto a different flight — a change, not just a delay
                "flight_change": {"to_flight": "UA 892", "new_arrival": "2:40 AM", "delta": "about 90 min later"},
                "bookings": [
-                   {"name": "Uber Reserve — airport pickup", "did": "rebooked your pickup for the new landing time"},
-                   {"name": "Meet & Assist porter (SFO)", "did": "updated your arrival with the porter desk"},
-                   {"name": "Hertz rental car", "did": "told the counter you'll collect later — reservation held"},
+                   {"name": "Uber Reserve — airport pickup", "did": "rebooked your pickup for the new landing time",
+                    "confirm": "UBR-4C21", "at": "meets you at arrivals ~3:15 AM"},
+                   {"name": "Meet & Assist porter (SFO)", "did": "updated your arrival with the porter desk",
+                    "confirm": "MA-1180"},
+                   {"name": "Hertz rental car", "did": "told the counter you'll collect later — reservation held",
+                    "confirm": "HZ-55207"},
                ],
                "flag": {"name": "8:00 AM team standup", "note": "you now land at 2:40 AM — that's a rough morning. Want me to ask the organizer to push it?"},
                "signals": {"delay_min": 90, "arrival_hour": 2,  "security_wait_min": 30, "pre_flight_min": 120, "security_fresh": True}},
@@ -291,8 +295,10 @@ _PERSONAS = {
                "hotel_address": "Hotel Zoo Berlin, Kurfürstendamm 25, 10719 Berlin, Germany",
                "flight": "LH 435", "route": "JFK → BER",
                "bookings": [
-                   {"name": "Uber Reserve — airport pickup", "did": "moved your pickup to the new arrival time"},
-                   {"name": "Gepäckträger (porter) at BER", "did": "updated your arrival time"},
+                   {"name": "Uber Reserve — airport pickup", "did": "moved your pickup to the new arrival time",
+                    "confirm": "UBR-2F08", "at": "meets you at arrivals ~1:50 AM"},
+                   {"name": "Gepäckträger (porter) at BER", "did": "updated your arrival time",
+                    "confirm": "MA-3391"},
                ],
                "signals": {"delay_min": 20, "arrival_hour": 23, "security_wait_min": 12, "pre_flight_min": 120, "security_fresh": True}},
 }
@@ -638,7 +644,13 @@ async def drive(run: ConciergeRun) -> None:
                     await run.queue.put(("agent", {"text":
                         "While I'm at it — I checked everything else on this trip that "
                         "moves with your arrival:"}))
-                    await run.queue.put(("synced", {"items": bookings, "flag": flag}))
+                    # the Uber ride gets its own booking-confirmed notification
+                    ride = next((b for b in bookings if "Uber" in b["name"]), None)
+                    others = [b for b in bookings if b is not ride]
+                    if ride:
+                        await run.queue.put(("ride", ride))
+                    if others or flag:
+                        await run.queue.put(("synced", {"items": others, "flag": flag}))
         await run.queue.put(("done", {"outcomes": outcomes}))
     except Exception as e:  # never hang the stream
         await run.queue.put(("error", {"message": f"{type(e).__name__}: {e}"}))

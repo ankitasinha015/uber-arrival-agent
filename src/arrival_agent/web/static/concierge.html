@@ -73,6 +73,14 @@ ul.synced{margin:7px 0 4px;padding-left:16px;font-size:12.5px;color:var(--ink-so
 ul.synced li{margin:3px 0} ul.synced b{color:var(--ink);font-weight:600}
 .flag{margin-top:8px;padding:8px 10px;background:#fff7ec;border:1px solid #f2dcae;border-radius:8px;
   font-size:12px;color:#8a6a2f;line-height:1.4} .flag b{color:#6b4f1c}
+.conf{font-family:var(--mono);font-size:10px;color:#1f9d55;background:#eafbf0;border:1px solid #cceedd;
+  border-radius:5px;padding:1px 5px;margin-left:2px;white-space:nowrap}
+.card.ride{background:#111;border-color:#111;color:#fff}
+.ride-h{display:flex;justify-content:space-between;align-items:center;font-size:13.5px;font-weight:700}
+.ride-badge{font-size:10.5px;font-weight:600;color:#5ef0a6;background:rgba(94,240,166,.12);
+  border:1px solid rgba(94,240,166,.3);border-radius:6px;padding:2px 7px}
+.ride-at{font-size:15px;font-weight:700;margin:7px 0 3px}
+.ride-meta{font-size:11.5px;color:#c9c9c9} .ride-meta b{color:#fff;font-family:var(--mono);font-size:11px}
 .read{align-self:center;font-family:var(--mono);font-size:10px;color:var(--ink-faint);
   background:var(--bg);border:1px dashed var(--rule-soft);border-radius:6px;padding:3px 9px;letter-spacing:.2px}
 /* login / traveler select */
@@ -216,11 +224,19 @@ function renderActed(d){
     + (d.note ? `<div class="draft">"${esc(d.note)}"</div>` : '')
     + `<div class="note-line">the agent handled this — no approval needed</div>`;
 }
+function renderRide(d){
+  const c = el('card ride');
+  c.innerHTML = `<div class="ride-h"><span>🚗 Uber pickup</span><span class="ride-badge">✓ Booking confirmed</span></div>`
+    + (d.at ? `<div class="ride-at">${esc(d.at)}</div>` : '')
+    + `<div class="ride-meta">${esc(d.did)}${d.confirm ? ' · confirmation <b>'+esc(d.confirm)+'</b>' : ''}</div>`;
+}
 function renderSynced(d){
   const c = el('card acted');
   let h = `<div class="lead">✅ Synced the rest of your trip to the new arrival:</div>`;
   h += '<ul class="synced">' + (d.items||[]).map(it =>
-        `<li><b>${esc(it.name)}</b> — ${esc(it.did)}</li>`).join('') + '</ul>';
+        `<li><b>${esc(it.name)}</b> — ${esc(it.did)}`
+        + (it.confirm ? ` <span class="conf">✓ ${esc(it.confirm)}</span>` : '')
+        + `</li>`).join('') + '</ul>';
   if (d.flag) h += `<div class="flag">⚠️ <b>${esc(d.flag.name)}</b> — ${esc(d.flag.note)}</div>`;
   h += `<div class="note-line">bookings updated automatically · the flagged item is yours to decide</div>`;
   c.innerHTML = h;
@@ -279,6 +295,7 @@ function start(){
     es.addEventListener('read', e => { const d = JSON.parse(e.data); el('read', esc(d.text.split('→')[0].trim())); });
     es.addEventListener('agent', e => el('bubble', esc(JSON.parse(e.data).text)));
     es.addEventListener('acted', e => renderActed(JSON.parse(e.data)));
+    es.addEventListener('ride', e => renderRide(JSON.parse(e.data)));
     es.addEventListener('synced', e => renderSynced(JSON.parse(e.data)));
     es.addEventListener('todo', e => renderTodo(JSON.parse(e.data)));
     es.addEventListener('you', e => { const d = JSON.parse(e.data); el('you', esc(d.text || VERB[d.decision] || d.decision)); });
