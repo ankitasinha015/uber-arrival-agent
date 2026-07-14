@@ -41,6 +41,16 @@ _DISHES = {
     "American": ["Half Roast Chicken", "BBQ Ribs", "Buffalo Wings"],
     "Pizza": ["Margherita Pizza", "Pepperoni Pizza", "Marinara Slice"],
 }
+# Restaurants the (synthetic) orders came from — real chain/spot names per cuisine.
+_EATS_SPOTS = {
+    "Ramen": ["Ippudo", "Totto Ramen", "Jinya Ramen Bar"],
+    "Mexican": ["Chipotle", "Taqueria Cancún", "El Farolito"],
+    "Thai": ["Thai Basil", "Lers Ros", "Farmhouse Kitchen"],
+    "Burger": ["Shake Shack", "Five Guys", "Super Duper Burgers"],
+    "American": ["The Cheesecake Factory", "Cracker Barrel", "The Smith"],
+    "Pizza": ["Joe's Pizza", "Blaze Pizza", "Prince Street Pizza"],
+}
+_BASE_PRICE = {"Ramen": 18, "Mexican": 15, "Thai": 20, "Burger": 16, "American": 24, "Pizza": 19}
 # past-order counts by taste rank — the top cuisine is ordered the most.
 _ORDER_WEIGHTS = [9, 6, 4, 3, 2, 1]
 
@@ -93,11 +103,17 @@ def seed(travelers: dict) -> tuple[int, int]:
         for rank, cuisine in enumerate(taste):
             n = _ORDER_WEIGHTS[rank] if rank < len(_ORDER_WEIGHTS) else 1
             dishes = _DISHES.get(cuisine, [f"{cuisine} dish"])
+            spots = _EATS_SPOTS.get(cuisine, [f"{cuisine} Place"])
+            base = _BASE_PRICE.get(cuisine, 18)
             for k in range(n):
                 dish = dishes[k % len(dishes)]
+                spot = spots[k % len(spots)]
+                price = round(base + (k % 3) * 2.5 + rank * 0.5, 2)
+                days_ago = rank * 6 + k * 2 + 1          # spread over the last ~3 months
                 eids.append(f"{tid}-{cuisine}-{k}")
-                edocs.append(f"{dish} — {cuisine}")
-                emeta.append({"traveler": tid, "cuisine": cuisine, "dish": dish})
+                edocs.append(f"{dish} from {spot} — {cuisine}")
+                emeta.append({"traveler": tid, "cuisine": cuisine, "dish": dish,
+                              "restaurant": spot, "price": price, "days_ago": days_ago})
 
     trav.add(ids=tids, documents=tdocs, embeddings=_embed(tdocs), metadatas=tmeta)
     eats.add(ids=eids, documents=edocs, embeddings=_embed(edocs), metadatas=emeta)
@@ -125,3 +141,20 @@ def taste_for(tid: str) -> list[str]:
     )
     counts = Counter(m["cuisine"] for m in (got.get("metadatas", []) or []))
     return [cz for cz, _ in counts.most_common()]
+
+
+def inventory() -> tuple[dict, list[dict]]:
+    """Everything currently in the store: (travelers dict, list of eats orders).
+    Used to show exactly what synthetic data exists."""
+    c = client()
+    tg = c.get_or_create_collection("travelers").get(include=["metadatas"])
+    travelers = {}
+    for tid, meta in zip(tg.get("ids", []) or [], tg.get("metadatas", []) or []):
+        try:
+            travelers[tid] = json.loads(meta["persona"])
+        except Exception:
+            pass
+    eg = c.get_or_create_collection("eats_orders").get(include=["metadatas"])
+    orders = [{"id": oid, **meta}
+              for oid, meta in zip(eg.get("ids", []) or [], eg.get("metadatas", []) or [])]
+    return travelers, orders
