@@ -30,6 +30,16 @@ taste = [
     "sentence-transformers>=3.0",
     "numpy>=1.26",
 ]
+# ChromaDB-backed synthetic data store for the web demo (CONCIERGE_CHROMA=1). The
+# native Rust backend segfaults on this Windows box, so Chroma runs in DOCKER and
+# the app talks to it over HTTP (chromadb.HttpClient) — the client here only makes
+# network calls. Embeddings are computed locally from the cached MiniLM model.
+#   docker run -d --name chroma -p 8001:8000 chromadb/chroma
+chroma = [
+    "chromadb>=1.5",
+    "sentence-transformers>=3.0",
+    "numpy>=1.26",
+]
 dev = [
     "pytest>=8.0",
     "ruff>=0.6",

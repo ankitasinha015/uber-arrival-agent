@@ -258,10 +258,11 @@ _SIGNALS = {
     "smooth":   {"delay_min": 0,  "arrival_hour": 21, "security_wait_min": 8,  "pre_flight_min": 120, "security_fresh": True},
 }
 
-# The five selectable travelers behind the login screen. Each is a full scenario:
-# its own Uber Eats taste profile (cuisine order), trip signals that drive the
-# intensity dial, and memory state. Picking one runs its scenario end to end.
-_PERSONAS = {
+# The selectable travelers — SYNTHETIC seed data. When CONCIERGE_CHROMA=1 this is
+# written into ChromaDB once and the app reads travelers back from there at runtime
+# (see below); otherwise it's used directly. Each is a full scenario: its own Uber
+# Eats taste profile, trip signals that drive the intensity dial, and memory state.
+_SEED_TRAVELERS = {
     "priya":  {"name": "Priya Nair",     "tag": "First-time flyer",  "initial": "P", "seasoned": False,
                "taste": ["Thai", "Ramen", "Mexican", "Burger", "American", "Pizza"],
                "city": "Chicago", "hotel": "The Langham, Chicago", "currency": "$",
@@ -316,6 +317,24 @@ _PERSONAS = {
                ],
                "signals": {"delay_min": 20, "arrival_hour": 23, "security_wait_min": 35, "pre_flight_min": 120, "security_fresh": True}},
 }
+
+# Load travelers from ChromaDB when CONCIERGE_CHROMA=1 (the web server sets it):
+# seed the synthetic data above into Chroma once, then read it back — so the app
+# runs off the data store, not the literal. Tests / plain imports fall back to the
+# seed, so nothing depends on a running container. `_CHROMA` records which path won.
+_CHROMA = False
+_PERSONAS = _SEED_TRAVELERS
+if os.environ.get("CONCIERGE_CHROMA") == "1":
+    try:
+        from arrival_agent.web import chroma_store
+        if chroma_store.available():
+            chroma_store.seed(_SEED_TRAVELERS)   # wipe+reseed so edits always propagate
+            loaded = chroma_store.load_travelers()
+            if loaded:
+                _PERSONAS = loaded
+                _CHROMA = True
+    except Exception:
+        pass
 
 # Location defaults for the non-persona demo modes (new/seasoned/smooth) and any
 # fallback — San Francisco, matching the original single-city demo.
@@ -392,8 +411,18 @@ def _signals_for(mode: str) -> dict:
 
 
 def _taste_for(mode: str) -> list[str]:
+    # When Chroma is on, the taste ranking is DERIVED from the traveler's Uber Eats
+    # order history in the DB (most-ordered cuisine first) — not the static list.
+    if _CHROMA and mode in _PERSONAS:
+        try:
+            from arrival_agent.web import chroma_store
+            ranked = chroma_store.taste_for(mode)
+            if ranked:
+                return ranked
+        except Exception:
+            pass
     if mode in _PERSONAS:
-        return _PERSONAS[mode]["taste"]
+        return _PERSONAS[mode].get("taste") or _UBER_EATS_PREF
     return _UBER_EATS_PREF
 
 
