@@ -106,7 +106,8 @@ def seed_seasoned(user_id: str = "seasoned") -> ActionMemory:
     sharper list. In-memory, for the demo/tests."""
     m = ActionMemory(user_id, in_memory=True)
     for _ in range(3):
-        m.record(Moment.DEPARTURE, ActionKind.HEADS_UP, "snooze")   # always snoozes the nudge
+        # He keeps the safety nudge (still worth a glance) but always handles the
+        # hotel himself — so only the hotel note gets trimmed, not the whole flow.
         m.record(Moment.DELAY, ActionKind.NOTIFY_HOTEL, "decline")  # handles the hotel themselves
         m.record(Moment.ARRIVAL, ActionKind.DINNER, "pick")         # always orders dinner
     return m

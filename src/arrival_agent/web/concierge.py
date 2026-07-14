@@ -314,7 +314,7 @@ _PERSONAS = {
                     "did": "released the 9:00 PM table — you'll land too late; I'll sort delivery to your room instead",
                     "confirm": "RES-2291", "at": "table released · switching to Uber Eats delivery"},
                ],
-               "signals": {"delay_min": 20, "arrival_hour": 23, "security_wait_min": 12, "pre_flight_min": 120, "security_fresh": True}},
+               "signals": {"delay_min": 20, "arrival_hour": 23, "security_wait_min": 35, "pre_flight_min": 120, "security_fresh": True}},
 }
 
 # Location defaults for the non-persona demo modes (new/seasoned/smooth) and any
