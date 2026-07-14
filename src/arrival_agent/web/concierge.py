@@ -581,6 +581,10 @@ def parse_intent(text: str, kind: str) -> dict:
         if any(w in t for w in ("yes", "notify", "tell", "let them", "go ahead", "sure", "ok", "please", "do it")):
             return {"decision": "yes", "text": text}
         return {"decision": "no", "text": text}
+    if kind == "book_ride":
+        if any(w in t for w in ("book", "yes", "ride", "uber", "go ahead", "sure", "ok", "please", "do it")):
+            return {"decision": "book", "text": text}
+        return {"decision": "decline", "text": text}
     if kind == "confirm_dish":
         if any(w in t for w in ("order", "yes", "confirm", "send", "get it", "go ahead", "sure", "please")):
             return {"decision": "confirm", "text": text}
@@ -777,14 +781,37 @@ async def drive(run: ConciergeRun) -> None:
                     await _emit(run, "read", {"text": actions.read, "intensity": actions.intensity})
                 for line in (intro if isinstance(intro, list) else [intro]):
                     await _emit(run, "agent", {"text": line})
-                # landed with a booked Uber → hand off to live tracking in the app
+                # arrival ride: land -> exit -> UBER to the hotel -> dinner.
                 if actions.moment == Moment.ARRIVAL:
                     ride = _uber_ride(run.mode)
+                    hotel = _loc(run.mode)["hotel"].split(",")[0]
                     if ride:
+                        # a pickup was already re-booked at the gate — hand off to tracking
                         await _emit(run, "track", {
                             "confirm": ride.get("confirm"), "at": ride.get("at"),
                             "url": "https://m.uber.com/",
                         })
+                    else:
+                        # everyone else books their ride to the hotel now, one tap
+                        pause = {"action_id": "book-ride", "kind": "book_ride",
+                                 "title": "Ride to your hotel", "payload": {"hotel": hotel}}
+                        await _emit(run, "todo", pause)
+                        run.response = loop.create_future()
+                        run.awaiting = True
+                        run.current = pause
+                        ui = await run.response
+                        run.awaiting = False
+                        run.current = None
+                        await _emit(run, "you", {"action_id": "book-ride",
+                                                 "decision": ui.get("decision"), "text": ui.get("text")})
+                        if ui.get("decision") in ("book", "yes", "confirm"):
+                            conf = "UBR-" + run.run_id[:4].upper()
+                            await _emit(run, "confirm", {
+                                "name": f"Uber to {hotel}", "icon": "🚗", "accent": "uber",
+                                "did": "booked your ride from the airport",
+                                "confirm": conf, "at": f"meets you at arrivals in ~{AIRPORT_EXIT_MIN} min"})
+                            await _emit(run, "track", {"confirm": conf,
+                                                       "at": "meets you at arrivals", "url": "https://m.uber.com/"})
 
             # --- drive this moment through the LangGraph StateGraph + SQLite ---
             if pending is not None:

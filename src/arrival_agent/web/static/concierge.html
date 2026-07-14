@@ -207,6 +207,14 @@ function renderTodo(d){
     off.textContent = 'a restaurant just went offline →';
     off.onclick = () => { respond(d.action_id, {decision:'order_rejected', restaurant_id:(p.options[0]||{}).restaurant_id}); };
     c.appendChild(off);
+  } else if (d.kind === 'book_ride'){
+    const c = el('card');
+    c.innerHTML = `<div class="lead">🚗 Ready when you are — want me to book an Uber to ${esc(p.hotel)}?</div>
+      <div class="axis">It'll be waiting at arrivals by the time you're out (~35 min).</div>
+      <div class="row"><button class="btn primary" data-a="book">Book my ride</button>
+      <button class="btn ghost" data-a="decline">I'll sort my own</button></div>`;
+    c.querySelector('[data-a="book"]').onclick = () => { markDone(c); respond(d.action_id, {decision:'book'}); };
+    c.querySelector('[data-a="decline"]').onclick = () => { markDone(c); respond(d.action_id, {decision:'decline'}); };
   } else if (d.kind === 'confirm_dish'){
     const c = el('card');
     const pitch = p.pitch || `A popular pick at ${esc(p.restaurant_name)} is the ${esc(p.dish)}.`;
@@ -265,7 +273,7 @@ function renderSynced(d){
   c.innerHTML = h;
 }
 
-const VERB = {yes:'Yes, tell the hotel', no:"No, I'll handle it", send:'Sent the note', pick:'Picked', confirm:'Order it', back:'Back to options', snooze:'Got it', decline:'No thanks'};
+const VERB = {yes:'Yes, tell the hotel', no:"No, I'll handle it", send:'Sent the note', pick:'Picked', confirm:'Order it', back:'Back to options', snooze:'Got it', decline:'No thanks', book:'Book my ride'};
 
 // ---- traveler login: pick one of the five, run their scenario ----
 let mode = null, PMETA = {};
