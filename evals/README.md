@@ -36,12 +36,18 @@ cases — so validation measures both TPR and TNR.
 
 **4. Judge validation (`validate.py`).** TPR (of real failures, fraction caught) and TNR
 (of good outputs, fraction not falsely flagged) against the gold labels — not raw
-accuracy, which class imbalance makes misleading. Current:
+accuracy, which class imbalance makes misleading. **Every evaluator — code and LLM —
+is validated:**
 
 ```
-cuisine_match   TPR 100%  TNR 100%   (n=11)
-honest_copy     TPR 100%  TNR 100%   (n=6)
+cuisine_match   TPR 100%  TNR 100%   (n=11)   code
+honest_copy     TPR 100%  TNR 100%   (n=8)    code
+axis_spread     TPR 100%  TNR 100%   (n=12)   LLM judge (EVAL_LIVE=1)
 ```
+
+The `axis_spread` LLM judge is validated on a balanced constructed set (6 genuine
+spreads + 6 failure types across all four axes) — it correctly fails the subtle cases
+("varies on price not speed", "no axis signal") too.
 
 **5. Property invariants (`choice_set_eval.py`).** Code-based structural regression gate
 over the golden choice sets (axis in enum, 2-3 distinct options, rationales present).
@@ -52,9 +58,10 @@ An evaluator that drifts goes red before it's trusted.
 
 ## Known gaps (honest, tracked)
 
-- **Judge validation is under-powered:** only 3 golden choice sets exist to validate the
-  `axis_spread` LLM judge against (target ~50 pass + 50 fail). Generating more needs the
-  live `choice_set` LLM call — the next data-generation step.
+- **`axis_spread` judge is validated on 12 balanced cases, not 50+.** It's aligned
+  (TPR/TNR 100%) but a larger, real-generated labeled set (via the live `choice_set` call)
+  would tighten the confidence interval. The balanced constructed set is enough to trust
+  the judge for now.
 - **Extraction is measured on the deterministic parser**; the actionable next eval is
   running the same 28 emails through the LLM path (`use_llm=True`) to quantify per-format
   recovery.

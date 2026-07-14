@@ -52,21 +52,56 @@ HONEST_COPY_GOLD = [
     ("you order ramen a lot — 300 m away", "Ramen", _BUR, False, "FALSE 'a lot': ramen is #6 (bottom half)"),
 ]
 
-# Choice-set axis-spread labels for LLM-judge validation (needs EVAL_LIVE + a key).
-# Labeled by reading each golden set: does it meaningfully vary along its stated axis?
-# NOTE: only 3 golden sets exist — this is under-powered for judge validation
-# (~50 pass + 50 fail is the target). Generating more needs the live choice_set LLM
-# call; tracked as a follow-up. Harness is here so it runs the moment more data lands.
 _GOLDEN = Path(__file__).resolve().parents[1] / "scenarios" / "cache" / "choice_set"
 
 
+def _cs(axis, opts):
+    return {"axis": axis, "options": [{"restaurant_name": n, "why_this_one": w} for n, w in opts]}
+
+
+# Labeled choice sets for validating the axis_spread LLM judge — both classes, across
+# all four axes. PASS = options meaningfully vary along the stated axis; FAIL =
+# near-duplicates or varying on a DIFFERENT axis than the one stated.
+AXIS_SPREAD_GOLD = [
+    # --- PASS: genuine spread along the stated axis ---
+    (_cs("cuisine", [("Ippudo", "ramen — your usual"), ("Tropisueño", "Mexican"),
+                     ("Joe's Pizza", "pizza")]), True, "three distinct cuisines"),
+    (_cs("speed_vs_quality", [("Ramen Counter", "grab-and-go, ~10 min"),
+                              ("Corner Bistro", "sit-down, balanced"),
+                              ("The Grille", "a real feast, slower")]), True, "fast→best spread"),
+    (_cs("volume", [("Onigiri Bar", "a light bite"), ("Bento House", "a proper meal"),
+                    ("Smokehouse", "a comfort feast")]), True, "light→feast spread"),
+    (_cs("familiarity_vs_novelty", [("Pad Thai Palace", "your usual go-to"),
+                                    ("Izakaya Mori", "new, highly-rated"),
+                                    ("Green Bowl", "a light salad")]), True, "usual/new/light spread"),
+    (_cs("cuisine", [("In-N-Out", "burger"), ("Osha Thai", "Thai"),
+                     ("Tacos El Gordo", "Mexican")]), True, "distinct cuisines"),
+    (_cs("speed_vs_quality", [("24h Diner", "fast, always open"),
+                              ("Neighborhood Trattoria", "balanced"),
+                              ("Tasting Room", "the best meal, slow")]), True, "fast→best spread"),
+    # --- FAIL: near-duplicates or off the stated axis ---
+    (_cs("cuisine", [("Shake Shack", "burger"), ("Five Guys", "burger"),
+                     ("Super Duper", "burger")]), False, "all burger — no cuisine spread"),
+    (_cs("speed_vs_quality", [("Cheap Counter", "$10, fast"), ("Mid Spot", "$20, fast"),
+                              ("Pricey Place", "$40, fast")]), False, "all fast — varies on PRICE not speed"),
+    (_cs("volume", [("Big Burger", "a heavy feast"), ("Double Stack", "a heavy feast"),
+                    ("Triple Co.", "a heavy feast")]), False, "all feasts — no volume spread"),
+    (_cs("cuisine", [("Joe's Pizza", "pizza"), ("Tony's Pizza", "pizza"),
+                     ("Prince St Pizza", "pizza")]), False, "all pizza — no spread"),
+    (_cs("familiarity_vs_novelty", [("Your Ramen Spot", "your usual"),
+                                    ("Ramen Two", "another usual ramen"),
+                                    ("Ramen Three", "your regular ramen")]), False, "all familiar — no novelty"),
+    (_cs("speed_vs_quality", [("A Good Spot", "a good spot nearby"),
+                              ("Another Option", "also nearby"),
+                              ("One More", "close by too")]), False, "no axis signal — vague/off-axis"),
+]
+
+
 def choice_set_gold() -> list[tuple[dict, bool]]:
-    """(choice_set, gold_pass) for each golden set. Hand-labeled below by file."""
-    labels = {  # filename-prefix -> gold_pass (human judgment of axis spread)
-        # default any unlabeled golden set to True; flip specific ones known muddy.
-    }
-    out = []
+    """Labeled choice sets for axis_spread judge validation: the balanced constructed
+    set above, plus the real golden sets (labeled pass — they passed the property gate
+    and read as genuine cuisine spreads)."""
+    out = list((cs, g) for cs, g, _ in AXIS_SPREAD_GOLD)
     for p in sorted(_GOLDEN.glob("*.json")):
-        cs = json.loads(p.read_text(encoding="utf-8"))
-        out.append((cs, labels.get(p.name, True)))
+        out.append((json.loads(p.read_text(encoding="utf-8")), True))
     return out

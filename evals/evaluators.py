@@ -83,5 +83,8 @@ def judge_axis_spread(cs: dict) -> dict:
         messages=[{"role": "user", "content": prompt}],
     )
     text = "".join(getattr(b, "text", "") for b in resp.content)
-    m = re.search(r"\{.*\}", text, re.S)
-    return json.loads(m.group(0)) if m else {"pass": None, "reason": text[:100]}
+    m = re.search(r"\{[^{}]*\}", text, re.S)   # first flat JSON object (robust to extra text)
+    try:
+        return json.loads(m.group(0)) if m else {"pass": None, "reason": text[:100]}
+    except Exception:
+        return {"pass": None, "reason": text[:100]}
