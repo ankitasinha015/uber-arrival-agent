@@ -346,6 +346,13 @@ def _uber_ride(mode: str):
                  if b.get("accent") == "uber" or "Uber" in b.get("name", "")), None)
 
 
+def _rental_car(mode: str):
+    """A rental-car booking, if any. If the traveler is driving themselves, the
+    agent must NOT also book an Uber — one way to the hotel, not two."""
+    bookings, _ = _trip_extras(mode)
+    return next((b for b in bookings if "rental" in b.get("name", "").lower()), None)
+
+
 # Scheduled arrival (local, 24h) per mode. The ACTUAL arrival is this + the
 # delay (or the flight-change time), computed once and used everywhere — so the
 # header, the read chip, the gate line and the hotel note never disagree.
@@ -781,9 +788,12 @@ async def drive(run: ConciergeRun) -> None:
                     await _emit(run, "read", {"text": actions.read, "intensity": actions.intensity})
                 for line in (intro if isinstance(intro, list) else [intro]):
                     await _emit(run, "agent", {"text": line})
-                # arrival ride: land -> exit -> UBER to the hotel -> dinner.
+                # arrival ride: land -> exit -> ONE way to the hotel -> dinner.
+                # Exactly one transport: a pre-booked Uber (track it), a rental car
+                # (they drive — no Uber), or book a fresh Uber.
                 if actions.moment == Moment.ARRIVAL:
                     ride = _uber_ride(run.mode)
+                    rental = _rental_car(run.mode)
                     hotel = _loc(run.mode)["hotel"].split(",")[0]
                     if ride:
                         # a pickup was already re-booked at the gate — hand off to tracking
@@ -791,6 +801,11 @@ async def drive(run: ConciergeRun) -> None:
                             "confirm": ride.get("confirm"), "at": ride.get("at"),
                             "url": "https://m.uber.com/",
                         })
+                    elif rental:
+                        # driving himself — the rental car IS the ride; no Uber
+                        await _emit(run, "agent", {"text":
+                            f"Your rental car's ready at the counter ({rental.get('confirm','held')}) — "
+                            f"grab it and you're a short drive to {hotel}. No ride to book."})
                     else:
                         # everyone else books their ride to the hotel now, one tap
                         pause = {"action_id": "book-ride", "kind": "book_ride",
