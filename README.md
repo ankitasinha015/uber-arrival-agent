@@ -18,31 +18,53 @@ cards change — a dead option is dropped and a backup backfilled).*
 
 ---
 
-## Trip Concierge (V3)
+## Trip Concierge
 
 The arrival agent above grew into a **trip concierge**: one agent watches the whole
-trip and, at each moment that matters, hands you a curated **one-tap action list** —
-and you approve every consequential step. It never acts on its own, and it gets
-sharper about you each trip.
+trip and, at each moment that matters, hands you a curated **action list**. Some steps
+it runs on its own and just tells you (a flight-change is already re-syncing your
+bookings by the time you look); the consequential ones it pauses for. It gets sharper
+about you each trip.
 
 Open **`/concierge`** for the assistant-thread demo:
 
 ```
-departure  → "security lines are heavy — leave earlier"          (tap: got it)
-delay      → "notify the hotel you'll arrive late"     (drafted; tap: send)
-arrival    → "dinner near your hotel, timed to your room"  (2-3 options; tap: pick)
+departure     → "security lines are heavy — leave earlier"           (tap: got it)
+delay/change  → auto-notifies the hotel, then re-syncs every arrival-  (agent acts,
+                coupled booking: cab, porter, rental, dinner reservation  tells you)
+arrival       → "dinner near your hotel, timed to your room" — most-    (tap: pick,
+                ordered dish, ready to send to the room                   then order)
 ```
 
-Each to-do is a *series of steps* the agent runs itself, pausing only at your pick
-or send. After each one it **re-checks what's next** — so recovery (a restaurant goes
-offline → surface a backup in-thread) is just the next action, not a special case.
-**Behaviour memory** makes a returning traveler's list shorter and sharper (it drops
-what you always dismiss) — toggle *first trip / 5th trip* to watch it. The dinner
-options and their axis come from one LLM call; the loop itself is a pure,
+Each to-do is a *series of steps* the agent runs itself, pausing only where your call
+matters. After each one it **re-checks what's next** — so recovery (a restaurant goes
+offline → surface a backup in-thread) and trip-sync (a delay cascades into every
+downstream booking) are just the next action, not special cases.
+
+- **It acts in proportion.** An **intensity dial** (HIGH / LOW / NONE) scales the whole
+  list to the traveler and the moment — full hand-holding for a nervous first-timer,
+  silence for a road warrior. **Behaviour memory** drops what a returning traveler
+  always dismisses.
+- **Five personas, five cities** — Chicago, New York, LA, San Francisco, and **Berlin
+  (international**, with the longer immigration + baggage exit time). Each has a distinct
+  signature moment (meet-&-greet, rental, Uber, dinner reservation). See
+  [`docs/PERSONAS.md`](docs/PERSONAS.md).
+
+The dinner options and their axis come from one LLM call; the loop itself is a pure,
 framework-agnostic controller (`core/domain/controller.py`) any adapter can drive.
 
 The original single-moment arrival agent (below) is now just the *arrival* moment of
 this concierge, and still runs at `/`.
+
+### Data: a synthetic first-party store (ChromaDB)
+
+Real trip/user data isn't available, so the demo runs on **synthetic data seeded into
+ChromaDB** — the same shape a real backend would have. A `travelers` collection holds
+each trip's facts; an `eats_orders` collection holds synthetic **Uber Eats order
+history**, and the dinner **taste ranking is derived from it** (aggregate the cuisines
+someone orders most) rather than hardcoded — the first-party-data "moat", made
+data-driven. The **one** thing that stays a live external call is restaurant geo
+(Foursquare). Details in [`docs/DATA_STORE.md`](docs/DATA_STORE.md).
 
 ---
 
@@ -72,7 +94,16 @@ Locally, against live APIs (needs your own keys):
 cp .env.example .env          # add FOURSQUARE_API_KEY, MAPS_API_KEY (Mapbox), ANTHROPIC_API_KEY
 pip install -e ".[taste]"     # core + the taste store (sentence-transformers)
 python -m uvicorn arrival_agent.web.server:app --port 8077
-# open http://127.0.0.1:8077
+# open http://127.0.0.1:8077  (arrival agent)  ·  /concierge  (full trip concierge)
+```
+
+The concierge reads travelers + order history from ChromaDB. Start the container and
+set `CONCIERGE_CHROMA=1` (it seeds synthetic data on first run); without it, the app
+falls back to an in-code seed. See [`docs/DATA_STORE.md`](docs/DATA_STORE.md):
+
+```bash
+docker run -d --name chroma -p 8001:8000 chromadb/chroma
+CONCIERGE_CHROMA=1 python -m uvicorn arrival_agent.web.server:app --port 8077
 ```
 
 Or drive a scenario in the terminal and watch every decision:
@@ -112,7 +143,12 @@ src/arrival_agent/
                     order rejected, check-in, user pick
     tools/          eta (Mapbox), restaurants (Foursquare), flight + orders (mocked)
     domain/         the reasoning — pure, no I/O:
+      controller.py   the concierge loop: run steps, pause only where your call matters
       retiming.py     predict room arrival; the wait-vs-act rule
+      itinerary.py    parse the booking email into a trip (flight/airport/hotel regex)
+      handlers.py     per-moment steps (heads-up, notify-hotel ask-first, dinner)
+      intensity.py    the HIGH/LOW/NONE dial — scale the list to traveler + moment
+      memory.py       behaviour memory — drop what a returning traveler dismisses
       envelope.py     the user's one-time curation policy
       recovery.py     restaurant-offline + no-supply fallbacks
       choice_set.py   the single LLM call: pick the axis, design 2-3 options
@@ -124,8 +160,12 @@ src/arrival_agent/
     raw/            contrast: the same agent hand-rolled, no framework
     naive/          baseline: orders too early, no choice-set design (the strawman)
   compare.py        run all three, emit a metrics table (LOC / tokens / timing)
-  web/              FastAPI + SSE — stream the agent's reasoning to the browser
+  web/              FastAPI + SSE — the concierge demo:
+    concierge.py      arrival design: live geo → cuisine-ranked dinner → dish to room
+    chroma_store.py   the synthetic ChromaDB store + confidence-gated cuisine classifier
+    concierge_graph.py LangGraph-backed concierge with a SqliteSaver checkpointer
 scenarios/          mock event timelines (+ recorded cache/ for replay)
+evals/              binary evaluators, LLM-judge validation, RAG + classifier evals
 ```
 
 The loop, on the LangGraph adapter:
@@ -170,12 +210,26 @@ LLM call: that `00:32` vs `01:12` gap is the whole product. Full write-up in
 ## Stack
 
 - **LangGraph** — orchestration: graph state, checkpointing, interrupts
-- **Foursquare Places API** — open restaurants + hours near the hotel
+- **Foursquare Places API** — open restaurants + hours near the hotel (the one live call)
 - **Mapbox** — airport → hotel ETA
 - **Anthropic Claude** — the choice-set reasoning (one structured tool-use call)
-- **sentence-transformers + numpy** — the per-user taste store (local, no API)
+- **ChromaDB** (in Docker) — the synthetic trip + Uber Eats order-history store;
+  taste ranking and the confidence-gated cuisine classifier read from it
+- **sentence-transformers + numpy** — local embeddings (all-MiniLM-L6-v2, no API)
 - **FastAPI + SSE** — streaming the agent's reasoning to the browser
 - Flight status and order placement are **mocked** — flight APIs are flaky, and
   there is no public Uber Eats consumer API. Honest constraints, not shortcuts.
 
 See [`DESIGN.md`](./DESIGN.md) for the full design and the decisions behind it.
+
+---
+
+## Evals
+
+The agent's value is *judgment*, which unit tests can't assert. After an eval audit,
+`evals/` holds binary evaluators (no Likert), gold labels for both classes, and
+**TPR/TNR validation** — including a rigorously validated LLM judge (train/dev/test +
+bias correction) and a synthetic stress-test that tuned the cuisine classifier to
+zero out-of-set false matches. The evals *found and fixed* real bugs (Korean-BBQ-as-
+American misclassification, false "you order X most" copy, a JetBlue flight-code miss).
+Full writeup in [`evals/README.md`](evals/README.md).
