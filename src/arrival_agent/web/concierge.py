@@ -122,11 +122,14 @@ _CUISINE_ALIASES = {
     "Pizza": ["pizza", "pizzeria", "italian"],
 }
 
-# A signature dish per taste cuisine — the agent suggests this because you order
-# that CUISINE a lot, not because you've ordered it at this specific spot.
-_SIGNATURE_DISH = {
-    "Ramen": "Tonkotsu Ramen", "Mexican": "Carnitas Tacos", "Thai": "Pad Thai",
-    "Burger": "Classic Cheeseburger", "American": "Roast Chicken", "Pizza": "Margherita Pizza",
+# The traveler's MOST-ORDERED dish per cuisine, from Uber Eats history. When they
+# pick a place of that cuisine, the agent offers to re-order their go-to (in a real
+# Uber build these come straight from order history; here they're mocked). Honest:
+# it's the dish you order most in this cuisine, fetched from THIS restaurant — not a
+# claim you've ordered at this specific spot before.
+_MOST_ORDERED_DISH = {
+    "Ramen": "Tonkotsu Ramen", "Mexican": "Carnitas Burrito", "Thai": "Pad Thai",
+    "Burger": "Double Cheeseburger", "American": "Half Roast Chicken", "Pizza": "Margherita Pizza",
 }
 
 # Honest fallback if the live location call fails — clearly still "near the hotel",
@@ -196,19 +199,18 @@ def _arrival_design(candidates, context):
 
         top_match = i == 0 and matched
         if matched:
-            dish = _SIGNATURE_DISH.get(cuisine, "the house special")
+            dish = _MOST_ORDERED_DISH.get(cuisine, "the house special")
             if top_match:
                 why = f"you order {cuisine.lower()} most on Uber Eats — {dist_txt}"
-                pitch = (f"You order {cuisine.lower()} more than anything on Uber Eats, so a "
-                         f"great pick at {name} is the {dish}.")
             else:
                 why = f"{cuisine} · a cuisine you order often — {dist_txt}"
-                pitch = (f"You order {cuisine.lower()} a lot on Uber Eats, so a great pick at "
-                         f"{name} is the {dish}.")
+            # taste-honest, dish-first: this is YOUR most-ordered dish in this cuisine
+            pitch = (f"Your most-ordered {cuisine.lower()} on Uber Eats is the {dish} — "
+                     f"I can get it from {name} and send it to your room.")
         else:
             dish = "the house special"
             why = f"{label} · {dist_txt}"
-            pitch = f"A popular pick at {name} is {dish}."
+            pitch = f"A popular pick at {name} is {dish} — I can send it to your room."
 
         o = ChoiceOption(
             option_id=f"opt-{i + 1}", restaurant_id=r["restaurant_id"] or f"r{i}",

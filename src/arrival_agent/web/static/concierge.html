@@ -167,8 +167,8 @@ function renderTodo(d){
     const c = el('card');
     const pitch = p.pitch || `A popular pick at ${esc(p.restaurant_name)} is the ${esc(p.dish)}.`;
     c.innerHTML = `<div class="lead">${esc(pitch)}</div>
-      <div class="axis">Order the <b>${esc(p.dish)}</b> to your room at ${esc(p.hotel)}?</div>
-      <div class="row"><button class="btn primary" data-a="confirm">Order to my room</button>
+      <div class="axis">Order the <b>${esc(p.dish)}</b> on Uber Eats from ${esc(p.restaurant_name)} to your room at ${esc(p.hotel)}?</div>
+      <div class="row"><button class="btn primary" data-a="confirm">Order it to my room</button>
       <button class="btn ghost" data-a="back">Back to options</button></div>`;
     c.querySelector('[data-a="confirm"]').onclick = () => { markDone(c); respond(d.action_id, {decision:'confirm'}); };
     c.querySelector('[data-a="back"]').onclick = () => { markDone(c); respond(d.action_id, {decision:'back'}); };
