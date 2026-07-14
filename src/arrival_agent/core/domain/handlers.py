@@ -106,6 +106,19 @@ class NotifyHotelHandler:
         return Prepared(pause="ask_hotel", payload=payload)
 
     def prepare(self, item: ActionItem, context: dict) -> Prepared:
+        # Action-first: on a real disruption the agent notifies the hotel itself
+        # and reports back — no approval tap. `auto_notify` gates this so a calm,
+        # on-time trip still just *offers*.
+        if context.get("auto_notify"):
+            note = self._draft(context)
+            self._note = note
+            result = self._send(note)
+            return Prepared(pause=None, outcome={
+                "sent": True, "auto": True, "note": note, "result": result,
+                "kind": context.get("notify_kind", "delayed"),
+                "new_flight": context.get("new_flight"),
+                "when": context.get("arrival_hhmm"),
+            })
         return self._ask(context)
 
     def resolve(self, item: ActionItem, user_input: dict, context: dict) -> Resolved:

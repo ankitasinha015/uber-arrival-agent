@@ -372,7 +372,7 @@ def _segments(memory, mode: str) -> list:
         ]
     else:
         gate_intro = (f"Hours later, at the gate — your flight slipped {delay} min, so you'll "
-                      f"land around {arr}.")
+                      f"land around {arr}. I'll give the hotel a heads-up so your room's held.")
     smooth_arrival = [welcome,
                       "You're in early tonight — everything's on track, kitchens are open and "
                       "the line was clear. One optional thing, then I'll leave you be:"]
@@ -460,6 +460,10 @@ def _context(mode: str = "new") -> dict:
     if fc:  # flight was changed — the hotel note becomes an update, not a first heads-up
         ctx["notify_kind"] = "changed"
         ctx["new_flight"] = fc["to_flight"]
+    # Action-first on a real disruption: the agent notifies the hotel itself and
+    # reports back, no approval tap. A calm on-time trip (no delay/change) still
+    # just offers.
+    ctx["auto_notify"] = bool(fc) or bool(sig.get("delay_min"))
     return ctx
 
 
@@ -555,6 +559,19 @@ def _pause_payload(step: Pause) -> dict:
     return {"action_id": step.action_id, "kind": step.kind, "title": step.title, "payload": step.payload}
 
 
+def _acted_payload(v: dict) -> dict:
+    """What the agent did on its own — shown to the traveler after the fact."""
+    when = v.get("when") or "later tonight"
+    if v.get("kind") == "changed":
+        text = (f"✅ Done — I've updated the hotel about your flight change"
+                f"{' (now ' + v['new_flight'] + ')' if v.get('new_flight') else ''}. "
+                f"They'll hold your room for your new arrival, ~{when}.")
+    else:
+        text = (f"✅ Done — I've let the hotel know you'll arrive around ~{when}, "
+                f"so they'll hold your room.")
+    return {"text": text, "note": v.get("note")}
+
+
 async def drive(run: ConciergeRun) -> None:
     """Walk the trip's moments in order. Each moment gets its own controller — one
     engine, many moments — streaming agent turns and pauses to the browser."""
@@ -585,6 +602,10 @@ async def drive(run: ConciergeRun) -> None:
                     "text": user_input.get("text"),
                 }))
                 step = await asyncio.to_thread(controller.respond, user_input)
+            for oc in step.outcomes:   # the agent auto-acted (no approval) — report back
+                v = oc.get("outcome")
+                if isinstance(v, dict) and v.get("auto") and v.get("sent"):
+                    await run.queue.put(("acted", _acted_payload(v)))
             outcomes.extend(step.outcomes)  # step is Done for this moment
         await run.queue.put(("done", {"outcomes": outcomes}))
     except Exception as e:  # never hang the stream

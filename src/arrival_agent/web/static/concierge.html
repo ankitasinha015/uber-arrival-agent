@@ -66,6 +66,9 @@ body{margin:0;background:var(--bg);font-family:var(--sans);color:var(--ink);
 .toggle button{font-size:10.5px;padding:5px 10px;border:none;background:var(--surface);color:var(--ink-soft);cursor:pointer}
 .toggle button.on{background:var(--ink);color:#fff}
 .dim{opacity:.5;pointer-events:none}
+.card.acted{border-color:#bfe3c8;background:#f6fbf7}
+.card.acted .lead{font-weight:600}
+.note-line{font-size:10.5px;color:var(--ink-faint);margin-top:2px}
 .read{align-self:center;font-family:var(--mono);font-size:10px;color:var(--ink-faint);
   background:var(--bg);border:1px dashed var(--rule-soft);border-radius:6px;padding:3px 9px;letter-spacing:.2px}
 /* login / traveler select */
@@ -203,6 +206,12 @@ function renderTodo(d){
   scroll();
 }
 function markDone(card){ card.classList.add('dim'); }
+function renderActed(d){
+  const c = el('card acted');
+  c.innerHTML = `<div class="lead">${esc(d.text)}</div>`
+    + (d.note ? `<div class="draft">"${esc(d.note)}"</div>` : '')
+    + `<div class="note-line">the agent handled this — no approval needed</div>`;
+}
 
 const VERB = {yes:'Yes, tell the hotel', no:"No, I'll handle it", send:'Sent the note', pick:'Picked', confirm:'Order it', back:'Back to options', snooze:'Got it', decline:'No thanks'};
 
@@ -256,6 +265,7 @@ function start(){
     es.addEventListener('context', e => renderCtx(JSON.parse(e.data)));
     es.addEventListener('read', e => { const d = JSON.parse(e.data); el('read', esc(d.text.split('→')[0].trim())); });
     es.addEventListener('agent', e => el('bubble', esc(JSON.parse(e.data).text)));
+    es.addEventListener('acted', e => renderActed(JSON.parse(e.data)));
     es.addEventListener('todo', e => renderTodo(JSON.parse(e.data)));
     es.addEventListener('you', e => { const d = JSON.parse(e.data); el('you', esc(d.text || VERB[d.decision] || d.decision)); });
     es.addEventListener('done', e => {
