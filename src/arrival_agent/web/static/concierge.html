@@ -150,12 +150,11 @@ function renderTodo(d){
     (p.options||[]).forEach((o,i) => {
       const eta = o.est_delivery_at ? new Date(o.est_delivery_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
       const cz = (o.cuisine_tags||[])[0];
-      const usual = /^your usual/i.test(o.why_this_one||'');
-      const b = document.createElement('button'); b.className = 'opt' + (usual ? ' usual' : '');
+      const b = document.createElement('button'); b.className = 'opt' + (o.badge ? ' usual' : '');
       b.innerHTML = `<div class="top"><span class="name">${esc(o.restaurant_name)}`
         + (cz ? ` <span class="cz">${esc(cz)}</span>` : '')
-        + (usual ? ` <span class="star">★ your usual</span>` : '') + `</span>
-        <span class="meta">$${Math.round(o.est_total)}${eta?' · eta '+eta:''}</span></div>
+        + (o.badge ? ` <span class="star">★ ${esc(o.badge)}</span>` : '') + `</span>
+        <span class="meta">~$${Math.round(o.est_total)}${eta?' · eta '+eta:''}</span></div>
         <div class="why">${esc(o.why_this_one)}</div>`;
       b.onclick = () => { markDone(c); respond(d.action_id, {decision:'pick', option_id:o.option_id}); };
       c.appendChild(b);
@@ -166,8 +165,9 @@ function renderTodo(d){
     c.appendChild(off);
   } else if (d.kind === 'confirm_dish'){
     const c = el('card');
-    c.innerHTML = `<div class="lead">Your usual at ${esc(p.restaurant_name)} is the <b>${esc(p.dish)}</b>.</div>
-      <div class="axis">Order it to your room at ${esc(p.hotel)}?</div>
+    const pitch = p.pitch || `A popular pick at ${esc(p.restaurant_name)} is the ${esc(p.dish)}.`;
+    c.innerHTML = `<div class="lead">${esc(pitch)}</div>
+      <div class="axis">Order the <b>${esc(p.dish)}</b> to your room at ${esc(p.hotel)}?</div>
       <div class="row"><button class="btn primary" data-a="confirm">Order to my room</button>
       <button class="btn ghost" data-a="back">Back to options</button></div>`;
     c.querySelector('[data-a="confirm"]').onclick = () => { markDone(c); respond(d.action_id, {decision:'confirm'}); };

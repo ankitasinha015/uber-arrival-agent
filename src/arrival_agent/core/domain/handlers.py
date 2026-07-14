@@ -38,6 +38,10 @@ def _opt(o) -> dict:
             if hasattr(o.est_delivery_at, "isoformat")
             else o.est_delivery_at
         )
+    for extra in ("badge", "dish_pitch"):          # taste-match hints (optional)
+        v = getattr(o, extra, None)
+        if v:
+            d[extra] = v
     return d
 
 
@@ -263,8 +267,9 @@ class DinnerHandler:
         if picked is None:
             return Resolved(done=False, repause="pick", payload={"options": self._options})
         self._picked = picked
-        dish = (picked.get("items") or ["your usual"])[0]
+        dish = (picked.get("items") or ["a popular dish"])[0]
         hotel = (context.get("city") or "your hotel").split(",")[0]
         return Resolved(done=False, repause="confirm_dish", payload={
             "restaurant_name": picked["restaurant_name"], "dish": dish, "hotel": hotel,
+            "pitch": picked.get("dish_pitch"),          # taste-honest sentence (or None)
         })

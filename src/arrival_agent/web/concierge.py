@@ -101,49 +101,122 @@ def _design(candidates, context):
 CITY = "San Francisco"
 AIRPORT_EXIT_MIN = 35   # deplane + bags (would be a live/airport feed in prod)
 
-# The user's Uber Eats order preference — favourite cuisines first (mocked; in a
-# real Uber build this is first-party order history).
+# The user's Uber Eats taste profile — favourite cuisines first. This is behavior
+# that travels WITH you (built from order history across cities), NOT a "usual
+# restaurant" in a place you've never been. In a real Uber build it's first-party
+# order history; here it's a mocked ordering of cuisines.
 _UBER_EATS_PREF = ["Ramen", "Mexican", "Thai", "Burger", "American", "Pizza"]
 
-# Cuisine-varied places near the hotel (mocked feed).
-_ARRIVAL_RESTAURANTS = [
-    {"restaurant_id": "a-ippudo", "restaurant_name": "Ippudo", "cuisine": "Ramen", "est_total": 19, "items": ["Tonkotsu Ramen"]},
-    {"restaurant_id": "a-tropi", "restaurant_name": "Tropisueño", "cuisine": "Mexican", "est_total": 24, "items": ["Carnitas Tacos"]},
-    {"restaurant_id": "a-super", "restaurant_name": "Super Duper Burgers", "cuisine": "Burger", "est_total": 16, "items": ["Burger, Fries"]},
-    {"restaurant_id": "a-grove", "restaurant_name": "The Grove", "cuisine": "American", "est_total": 22, "items": ["Roast Chicken"]},
-    {"restaurant_id": "a-osha", "restaurant_name": "Osha Thai", "cuisine": "Thai", "est_total": 21, "items": ["Pad See Ew"]},
+# How Foursquare's category names map onto the user's taste cuisines. Checked in
+# _UBER_EATS_PREF order, so the earliest (strongest) preference wins a match.
+_CUISINE_ALIASES = {
+    "Ramen": ["ramen", "noodle", "japanese"],
+    "Mexican": ["mexican", "taqueria", "taco", "cal"],
+    "Thai": ["thai"],
+    "Burger": ["burger"],
+    "American": ["american", "diner", "bbq", "barbecue", "steak", "grill", "comfort"],
+    "Pizza": ["pizza", "pizzeria", "italian"],
+}
+
+# A signature dish per taste cuisine — the agent suggests this because you order
+# that CUISINE a lot, not because you've ordered it at this specific spot.
+_SIGNATURE_DISH = {
+    "Ramen": "Tonkotsu Ramen", "Mexican": "Carnitas Tacos", "Thai": "Pad Thai",
+    "Burger": "Classic Cheeseburger", "American": "Roast Chicken", "Pizza": "Margherita Pizza",
+}
+
+# Honest fallback if the live location call fails — clearly still "near the hotel",
+# never claimed to be your history.
+_ARRIVAL_FALLBACK = [
+    {"restaurant_id": "fb-1", "restaurant_name": "Ippudo", "categories": ["Ramen Restaurant"], "distance_m": 300},
+    {"restaurant_id": "fb-2", "restaurant_name": "Tropisueño", "categories": ["Mexican Restaurant"], "distance_m": 420},
+    {"restaurant_id": "fb-3", "restaurant_name": "Super Duper Burgers", "categories": ["Burger Joint"], "distance_m": 350},
+    {"restaurant_id": "fb-4", "restaurant_name": "The Grove", "categories": ["American Restaurant"], "distance_m": 500},
+    {"restaurant_id": "fb-5", "restaurant_name": "Osha Thai", "categories": ["Thai Restaurant"], "distance_m": 520},
 ]
 
 
+def _match_cuisine(categories: list[str]) -> str | None:
+    """Best taste-cuisine this place matches, or None. Highest preference wins."""
+    blob = " ".join(categories).lower()
+    for cuisine in _UBER_EATS_PREF:
+        if any(alias in blob for alias in _CUISINE_ALIASES[cuisine]):
+            return cuisine
+    return None
+
+
+def _cuisine_label(categories: list[str]) -> str:
+    """A short cuisine label for display — strip Foursquare's 'Restaurant' noise."""
+    if not categories:
+        return "Restaurant"
+    return categories[0].replace(" Restaurant", "").replace(" Place", "").strip() or "Restaurant"
+
+
 def _arrival_find(context):
-    return list(_ARRIVAL_RESTAURANTS)
+    """Real restaurants near the hotel, pulled live from the location API each
+    run. Falls back to a small honest set only if the live call fails."""
+    try:
+        places = restaurants_mod.get_eats_options(_HOTEL, limit=12)
+        return places or _ARRIVAL_FALLBACK
+    except Exception:
+        return _ARRIVAL_FALLBACK
 
 
 def _arrival_design(candidates, context):
-    """Rank places near the hotel by the cuisines the user orders most on Uber
-    Eats, mark their usual, and show the range of cuisines available."""
-    rank = {c: i for i, c in enumerate(_UBER_EATS_PREF)}
-    ordered = sorted(candidates, key=lambda r: rank.get(r.get("cuisine"), 99))
+    """Take what's actually open near the hotel (live geo) and rank it by the
+    cuisines the traveler orders most on Uber Eats. The match is taste↔location:
+    'you order ramen most → this ramen spot near you', never 'your usual here'."""
+    def sort_key(r):
+        cuisine = _match_cuisine(r.get("categories", []))
+        rank = _UBER_EATS_PREF.index(cuisine) if cuisine else 99
+        return (rank, r.get("distance_m") or 9999)
+
+    ordered = sorted(candidates, key=sort_key)
     options = []
     for i, r in enumerate(ordered[:4]):
-        usual = i == 0
-        why = (f"your usual — you order {r['cuisine'].lower()} most trips" if usual
-               else f"{r['cuisine']} · near your hotel")
+        name = r["restaurant_name"]
+        cuisine = _match_cuisine(r.get("categories", []))
+        label = cuisine or _cuisine_label(r.get("categories", []))
+        dist = r.get("distance_m")
+        dist_txt = f"{round(dist)} m away" if dist else "near your hotel"
+        matched = cuisine is not None
+
+        top_match = i == 0 and matched
+        if matched:
+            dish = _SIGNATURE_DISH.get(cuisine, "the house special")
+            if top_match:
+                why = f"you order {cuisine.lower()} most on Uber Eats — {dist_txt}"
+                pitch = (f"You order {cuisine.lower()} more than anything on Uber Eats, so a "
+                         f"great pick at {name} is the {dish}.")
+            else:
+                why = f"{cuisine} · a cuisine you order often — {dist_txt}"
+                pitch = (f"You order {cuisine.lower()} a lot on Uber Eats, so a great pick at "
+                         f"{name} is the {dish}.")
+        else:
+            dish = "the house special"
+            why = f"{label} · {dist_txt}"
+            pitch = f"A popular pick at {name} is {dish}."
+
         o = ChoiceOption(
-            option_id=f"opt-{i + 1}", restaurant_id=r["restaurant_id"],
-            restaurant_name=r["restaurant_name"], items=list(r["items"]),
-            est_total=float(r["est_total"]), cuisine_tags=[r["cuisine"]],
+            option_id=f"opt-{i + 1}", restaurant_id=r["restaurant_id"] or f"r{i}",
+            restaurant_name=name, items=[dish],
+            est_total=float(18 + 2 * i), cuisine_tags=[label],
             why_this_one=why,
         )
         o.est_delivery_at = context.get("deliver_at", _DELIVER)
+        o.dish_pitch = pitch
+        # Badge only the top card, and only if it genuinely matches your taste.
+        if i == 0 and matched:
+            o.badge = "matches what you order"
         options.append(o)
 
     class _CS:
         pass
     cs = _CS()
     cs.options, cs.axis = options, ChoiceAxis.CUISINE
-    cs.why_these = "ranked by the cuisines you order most on Uber Eats"
-    cs.lead = f"Want to sort dinner? Here are places near {_HOTEL.split(',')[0]}, by the cuisines you usually order:"
+    cs.why_these = "what's open near your hotel now, ranked by what you order most on Uber Eats"
+    cs.lead = (f"Here's what's open near {_HOTEL.split(',')[0]} right now — ranked by the "
+               f"cuisines you order most on Uber Eats:")
     return cs
 
 

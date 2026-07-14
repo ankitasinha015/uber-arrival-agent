@@ -70,6 +70,10 @@ class ChoiceOption(BaseModel):
     est_delivery_at: datetime | None = None
     cuisine_tags: list[str] = Field(default_factory=list)
     why_this_one: str  # the agent's one-line rationale for including THIS option
+    # Optional taste-match hints (arrival flow): a short badge for the top match,
+    # and a taste-honest one-liner tying the dish to what the traveler orders most.
+    badge: str | None = None
+    dish_pitch: str | None = None
 
 
 class AgentDecision(BaseModel):
