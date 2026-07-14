@@ -121,7 +121,9 @@ async function respond(actionId, body){
 
 function esc(s){ return (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
+let CUR = '$';
 function renderCtx(c){
+  if (c.currency) CUR = c.currency;
   const box = $('#ctx'); box.hidden = false;
   const live = `security ${c.security_min}m · ${c.delay_min ? ('delayed '+c.delay_min+'m') : 'on time'}`;
   box.innerHTML =
@@ -173,7 +175,7 @@ function renderTodo(d){
       b.innerHTML = `<div class="top"><span class="name">${esc(o.restaurant_name)}`
         + (cz ? ` <span class="cz">${esc(cz)}</span>` : '')
         + (o.badge ? ` <span class="star">★ ${esc(o.badge)}</span>` : '') + `</span>
-        <span class="meta">~$${Math.round(o.est_total)}${eta?' · eta '+eta:''}</span></div>
+        <span class="meta">~${CUR}${Math.round(o.est_total)}${eta?' · eta '+eta:''}</span></div>
         <div class="why">${esc(o.why_this_one)}</div>`;
       b.onclick = () => { markDone(c); respond(d.action_id, {decision:'pick', option_id:o.option_id}); };
       c.appendChild(b);

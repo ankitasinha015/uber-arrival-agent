@@ -6,6 +6,12 @@ first-timer and stays silent for the road warrior. Each persona is a real trip
 profile mapped to how the agent actually behaves: which moments fire, how loud,
 and what its memory has learned.
 
+Each traveler lands in a **different city** — Chicago, New York, Los Angeles,
+San Francisco, and **Berlin (international)** — so the location engine (live
+geocode + real nearby restaurants + local currency) is exercised end to end. The
+dinner set is always real places near *that* hotel, ranked by *that* traveler's
+Uber Eats taste.
+
 **The intensity dial** — how much the agent acts:
 - **HIGH** — full action list, every step approved
 - **LOW** — one optional offer, then quiet
@@ -15,7 +21,7 @@ and what its memory has learned.
 
 ## 01 · Priya Nair — The First-Time Flyer  `TRIP·NEW`  ·  intensity **HIGH**
 
-26 · first solo work trip · EWR → SFO
+26 · first solo work trip · EWR → ORD · lands Chicago
 Trips/yr 1–2 · Eats: Thai, Ramen · Arrival: late, unfamiliar city
 
 - **Job:** "Don't let me miss anything. Tell me what to do and *when*." She's
@@ -31,7 +37,7 @@ Trips/yr 1–2 · Eats: Thai, Ramen · Arrival: late, unfamiliar city
 
 ## 02 · Marcus Boyd — The Road Warrior  `TRIP·PRO`  ·  intensity **LOW** (memory-trimmed)
 
-44 · management consultant · 45+ flights a year
+44 · management consultant · SFO → JFK · lands New York · 45+ flights/yr
 Trips/yr 45+ · Eats: Burger, American · Arrival: routine, self-managed
 
 - **Job:** "Don't nag me. Surface *only* what I'd actually miss." He already
@@ -47,7 +53,7 @@ Trips/yr 45+ · Eats: Burger, American · Arrival: routine, self-managed
 
 ## 03 · Olivia Chen — The On-Time Optimist  `TRIP·CALM`  ·  intensity **NONE→LOW**
 
-33 · product marketer · lands 9:40 p.m., on schedule
+33 · product marketer · JFK → LAX · lands Los Angeles 9:40 p.m., on schedule
 Trips/yr 8 · Eats: Mexican, Pizza · Arrival: on time, early evening
 
 - **Job:** "If everything's fine, leave me alone — but *be there* if it isn't."
@@ -62,7 +68,7 @@ Trips/yr 8 · Eats: Mexican, Pizza · Arrival: on time, early evening
 
 ## 04 · Dev Patel — The Red-Eye Arriver  `TRIP·DELAY`  ·  intensity **HIGH** (recovery)
 
-38 · engineer · flight slips 45 min, now landing 1:12 a.m.
+38 · engineer · EWR → SFO · lands San Francisco · flight slips 45 min, now 1:12 a.m.
 Trips/yr 15 · Eats: Ramen, Mexican · Arrival: delayed, past midnight
 
 - **Job:** "It's late and I'm wrecked — *make the landing soft*." Check-in is
@@ -78,7 +84,7 @@ Trips/yr 15 · Eats: Ramen, Mexican · Arrival: delayed, past midnight
 
 ## 05 · Lena Kowalski — The Creature of Habit  `TRIP·TASTE`  ·  intensity **LOW** (taste-led)
 
-29 · designer · orders the same three cuisines, relentlessly
+29 · designer · JFK → BER · lands Berlin (international, €) · orders the same cuisines relentlessly
 Trips/yr 12 · Eats: 80% Mexican · Arrival: decision-fatigued
 
 - **Job:** "Don't make me choose. You already *know* what I want." After a
@@ -94,7 +100,8 @@ Trips/yr 12 · Eats: 80% Mexican · Arrival: decision-fatigued
 
 ---
 
-Each persona maps to a live mode in the demo — `?mode=new`, `?mode=seasoned`,
-`?mode=smooth` — plus the delay and taste flows. The through-line: **one engine,
-proportionate response.** Same agent, five very different traveler needs, met by
-acting more or less rather than always the same.
+Each persona is selectable from the demo's **traveler login screen**, or deep-linked
+directly — `?mode=priya`, `?mode=marcus`, `?mode=olivia`, `?mode=dev`, `?mode=lena`.
+The through-line: **one engine, proportionate response.** Same agent, five very
+different traveler needs — different cities, tastes, and trip states — met by acting
+more or less rather than always the same.

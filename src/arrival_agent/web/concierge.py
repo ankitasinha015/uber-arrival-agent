@@ -102,7 +102,6 @@ def _design(candidates, context):
 
 # --- arrival: the city welcome, airport-exit time, and cuisine-ranked dinner ---
 
-CITY = "San Francisco"
 AIRPORT_EXIT_MIN = 35   # deplane + bags (would be a live/airport feed in prod)
 
 # The user's Uber Eats taste profile — favourite cuisines first. This is behavior
@@ -162,10 +161,11 @@ def _cuisine_label(categories: list[str]) -> str:
 
 
 def _arrival_find(context):
-    """Real restaurants near the hotel, pulled live from the location API each
-    run. Falls back to a small honest set only if the live call fails."""
+    """Real restaurants near THIS traveler's hotel, pulled live from the location
+    API each run. Falls back to a small honest set only if the live call fails."""
+    address = (context or {}).get("hotel_address", _HOTEL_ADDRESS)
     try:
-        places = restaurants_mod.get_eats_options(_HOTEL_ADDRESS, limit=12)
+        places = restaurants_mod.get_eats_options(address, limit=12)
         return places or _ARRIVAL_FALLBACK
     except Exception:
         return _ARRIVAL_FALLBACK
@@ -233,7 +233,8 @@ def _arrival_design(candidates, context):
     cs = _CS()
     cs.options, cs.axis = options, ChoiceAxis.CUISINE
     cs.why_these = "what's open near your hotel now, ranked by what you order most on Uber Eats"
-    cs.lead = (f"Here's what's open near {_HOTEL.split(',')[0]} right now — ranked by the "
+    hotel_short = (context.get("city") or "your hotel").split(",")[0]
+    cs.lead = (f"Here's what's open near {hotel_short} right now — ranked by the "
                f"cuisines you order most on Uber Eats:")
     return cs
 
@@ -251,20 +252,48 @@ _SIGNALS = {
 _PERSONAS = {
     "priya":  {"name": "Priya Nair",     "tag": "First-time flyer",  "initial": "P", "seasoned": False,
                "taste": ["Thai", "Ramen", "Mexican", "Burger", "American", "Pizza"],
+               "city": "Chicago", "hotel": "The Langham, Chicago", "currency": "$",
+               "hotel_address": "The Langham, 330 N Wabash Ave, Chicago, IL 60611",
+               "flight": "UA 512", "route": "EWR → ORD",
                "signals": {"delay_min": 45, "arrival_hour": 1,  "security_wait_min": 45, "pre_flight_min": 120, "security_fresh": True}},
     "marcus": {"name": "Marcus Boyd",    "tag": "Road warrior",      "initial": "M", "seasoned": True,
                "taste": ["Burger", "American", "Pizza", "Mexican", "Thai", "Ramen"],
+               "city": "New York", "hotel": "The New Yorker, New York", "currency": "$",
+               "hotel_address": "The New Yorker Hotel, 481 8th Ave, New York, NY 10001",
+               "flight": "DL 208", "route": "SFO → JFK",
                "signals": {"delay_min": 45, "arrival_hour": 1,  "security_wait_min": 45, "pre_flight_min": 120, "security_fresh": True}},
     "olivia": {"name": "Olivia Chen",    "tag": "On-time optimist",  "initial": "O", "seasoned": False,
                "taste": ["Mexican", "Pizza", "American", "Burger", "Thai", "Ramen"],
+               "city": "Los Angeles", "hotel": "The LINE, Los Angeles", "currency": "$",
+               "hotel_address": "The LINE Hotel, 3515 Wilshire Blvd, Los Angeles, CA 90010",
+               "flight": "AA 118", "route": "JFK → LAX",
                "signals": {"delay_min": 0,  "arrival_hour": 21, "security_wait_min": 8,  "pre_flight_min": 120, "security_fresh": True}},
     "dev":    {"name": "Dev Patel",      "tag": "Red-eye arriver",   "initial": "D", "seasoned": False,
                "taste": ["Ramen", "Mexican", "Thai", "Burger", "American", "Pizza"],
+               "city": "San Francisco", "hotel": "Hotel Zephyr, San Francisco", "currency": "$",
+               "hotel_address": "Hotel Zephyr, 250 Beach St, San Francisco, CA 94133",
+               "flight": "UA 517", "route": "EWR → SFO",
                "signals": {"delay_min": 90, "arrival_hour": 1,  "security_wait_min": 30, "pre_flight_min": 120, "security_fresh": True}},
     "lena":   {"name": "Lena Kowalski",  "tag": "Creature of habit", "initial": "L", "seasoned": False,
                "taste": ["Mexican", "Thai", "Pizza", "American", "Burger", "Ramen"],
+               "city": "Berlin", "hotel": "Hotel Zoo, Berlin", "currency": "€",
+               "hotel_address": "Hotel Zoo Berlin, Kurfürstendamm 25, 10719 Berlin, Germany",
+               "flight": "LH 435", "route": "JFK → BER",
                "signals": {"delay_min": 20, "arrival_hour": 23, "security_wait_min": 12, "pre_flight_min": 120, "security_fresh": True}},
 }
+
+# Location defaults for the non-persona demo modes (new/seasoned/smooth) and any
+# fallback — San Francisco, matching the original single-city demo.
+_SF_LOC = {"city": "San Francisco", "hotel": _HOTEL, "hotel_address": _HOTEL_ADDRESS,
+           "flight": "UA 517", "route": "EWR → SFO", "currency": "$"}
+
+
+def _loc(mode: str) -> dict:
+    """The traveler's location + trip facts (hotel, city, flight, currency)."""
+    p = _PERSONAS.get(mode)
+    if not p:
+        return _SF_LOC
+    return {k: p[k] for k in ("city", "hotel", "hotel_address", "flight", "route", "currency")}
 
 
 def _signals_for(mode: str) -> dict:
@@ -292,14 +321,6 @@ def personas() -> list[dict]:
 
 _DEP_INTRO_HIGH = "Before you head out — security's running long right now. Leave sooner:"
 _DEP_INTRO_LOW = "Before you head out — one thing worth doing:"
-_GATE_HOTEL_INTRO = ("Hours later, at the gate — your flight slipped 45 min, so you'll land around "
-                     "1:12 AM.")
-_WELCOME = f"Welcome to {CITY} 👋"
-_EXIT_LINE = (f"You're about {AIRPORT_EXIT_MIN} min from being out of the airport "
-              f"(deplane, then bags) — in your room by ~1:12 AM.")
-_SMOOTH_ARRIVAL = [f"Welcome to {CITY} 👋",
-                   "You're in early tonight — everything's on track, kitchens are open and the "
-                   "line was clear. One optional thing, then I'll leave you be:"]
 
 
 def _departure_segment(sig, memory):
@@ -333,6 +354,18 @@ def _segments(memory, mode: str) -> list:
     """The trip as a sequence of (intro, ActionList) moments, sized by the dial.
     intro may be a list of lines (the arrival welcome is several agent turns)."""
     sig = _signals_for(mode)
+    loc = _loc(mode)
+    city = loc["city"]
+    delay = sig.get("delay_min", 0)
+    arr = "9:40 PM" if not delay else "1:12 AM"
+    welcome = f"Welcome to {city} 👋"
+    exit_line = (f"You're about {AIRPORT_EXIT_MIN} min from being out of the airport "
+                 f"(deplane, then bags) — in your room by ~{arr}.")
+    gate_intro = (f"Hours later, at the gate — your flight slipped {delay} min, so you'll "
+                  f"land around {arr}.")
+    smooth_arrival = [welcome,
+                      "You're in early tonight — everything's on track, kitchens are open and "
+                      "the line was clear. One optional thing, then I'll leave you be:"]
     segs = []
 
     dep = _departure_segment(sig, memory)
@@ -344,26 +377,27 @@ def _segments(memory, mode: str) -> list:
         # so memory drops it and this segment is skipped)
         hotel = _hotel_list(memory)
         if hotel:
-            segs.append((_GATE_HOTEL_INTRO, ActionList(
+            segs.append((gate_intro, ActionList(
                 moment=Moment.DELAY, reasoning="hold the room", items=hotel,
                 intensity="high", read=read(Moment.DELAY, sig))))
         # on arrival: welcome + airport-exit time + cuisine-ranked dinner
-        segs.append(([_WELCOME, _EXIT_LINE], ActionList(
+        segs.append(([welcome, exit_line], ActionList(
             moment=Moment.ARRIVAL, reasoning="dinner near the hotel",
             items=[curate_actions(Moment.ARRIVAL).items[0]], intensity="high", read="")))
     else:
         # calm arrival: welcome + one optional hotel offer, no dinner
-        segs.append((_SMOOTH_ARRIVAL, ActionList(
+        segs.append((smooth_arrival, ActionList(
             moment=Moment.DELAY, reasoning="all good", items=_hotel_list(memory),
             intensity="low", read="")))
     return segs
 
 
-def _handlers():
+def _handlers(mode: str = "new"):
+    hotel = _loc(mode)["hotel"]
     return {
         ActionKind.HEADS_UP: HeadsUpHandler(),
         ActionKind.NOTIFY_HOTEL: NotifyHotelHandler(
-            send=lambda note: send_hotel_note(_HOTEL, note),
+            send=lambda note: send_hotel_note(hotel, note),
         ),
         ActionKind.DINNER: DinnerHandler(
             find=_arrival_find,
@@ -377,12 +411,13 @@ def _handlers():
 def _trip_context(mode: str) -> dict:
     """The facts the agent pulled — shown at the top so you see its inputs."""
     sig = _signals_for(mode)
+    loc = _loc(mode)
     delay = sig.get("delay_min", 0)
     arrival = "~9:40 PM (on time)" if not delay else f"~1:12 AM (delayed {delay}m)"
     meta = _PERSONAS.get(mode)
     return {
-        "flight": "UA 517", "route": "EWR → SFO", "hotel": "Hotel Zephyr, San Francisco",
-        "arrival": arrival,
+        "flight": loc["flight"], "route": loc["route"], "hotel": loc["hotel"],
+        "arrival": arrival, "currency": loc["currency"],
         "traveler": meta["name"] if meta else None,
         "initial": meta["initial"] if meta else "A",
         "security_min": sig.get("security_wait_min"),
@@ -393,8 +428,11 @@ def _trip_context(mode: str) -> dict:
 
 def _context(mode: str = "new") -> dict:
     sig = _signals_for(mode)
+    loc = _loc(mode)
     arrival_hhmm = "9:40 PM" if not sig.get("delay_min") else "1:15 AM"
-    return {"arrival_hhmm": arrival_hhmm, "city": _HOTEL, "deliver_at": _DELIVER,
+    return {"arrival_hhmm": arrival_hhmm, "city": loc["hotel"], "deliver_at": _DELIVER,
+            "hotel_address": loc["hotel_address"],   # where the geo tool searches
+            "currency": loc["currency"], "city_name": loc["city"],
             "time_of_day": f"{_ARRIVAL:%H:%M} (room arrival estimate)",
             "fatigue": "high late-night arrival after a flight",
             "pref": _taste_for(mode)}   # this traveler's Uber Eats cuisine order
@@ -506,7 +544,7 @@ async def drive(run: ConciergeRun) -> None:
                 await run.queue.put(("read", {"text": actions.read, "intensity": actions.intensity}))
             for line in (intro if isinstance(intro, list) else [intro]):
                 await run.queue.put(("agent", {"text": line}))
-            controller = TripController(actions, _handlers(), _context(run.mode))
+            controller = TripController(actions, _handlers(run.mode), _context(run.mode))
             step = await asyncio.to_thread(controller.start)
             while isinstance(step, Pause):
                 await run.queue.put(("todo", _pause_payload(step)))
