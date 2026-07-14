@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Choice-Set Review</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
+    --ink:#e7e9ee; --dim:#9aa3b2; --accent:#5b8cff;
+    --pass:#2ecc71; --fail:#ff5d5d; --defer:#f5a623; --badge:#8b5cf6;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  header { position:sticky; top:0; z-index:5; background:var(--panel);
+    border-bottom:1px solid var(--line); padding:10px 18px; display:flex;
+    align-items:center; gap:14px; flex-wrap:wrap; }
+  header h1 { font-size:15px; margin:0; font-weight:600; letter-spacing:.2px; }
+  .counter { color:var(--dim); font-variant-numeric:tabular-nums; }
+  .counter b { color:var(--ink); }
+  .spacer { flex:1; }
+  .btn { border:1px solid var(--line); background:var(--panel2); color:var(--ink);
+    padding:7px 12px; border-radius:8px; cursor:pointer; font-size:13px; }
+  .btn:hover { border-color:var(--accent); }
+  .btn.small { padding:4px 9px; font-size:12px; }
+  input#jump { width:92px; background:var(--panel2); border:1px solid var(--line);
+    color:var(--ink); border-radius:8px; padding:6px 9px; }
+  main { max-width:1180px; margin:0 auto; padding:20px; display:grid;
+    grid-template-columns: 1fr 320px; gap:20px; align-items:start; }
+  @media (max-width:900px){ main{ grid-template-columns:1fr; } }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:18px 20px; }
+  .scenario { color:var(--dim); font-size:12.5px; text-transform:uppercase;
+    letter-spacing:.6px; margin-bottom:6px; }
+  .trav { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:2px;}
+  .trav .name { font-size:20px; font-weight:700; }
+  .trav .hotel { color:var(--dim); }
+  .taste { display:flex; gap:6px; flex-wrap:wrap; margin:10px 0 4px; }
+  .chip { background:var(--panel2); border:1px solid var(--line); border-radius:999px;
+    padding:2px 10px; font-size:12px; color:var(--dim); }
+  .chip.top { color:var(--ink); border-color:var(--accent); }
+  .lead { margin:16px 0 4px; font-size:14px; color:var(--dim);
+    border-left:3px solid var(--accent); padding-left:12px; }
+  .opt { border:1px solid var(--line); border-radius:12px; padding:14px 16px;
+    margin-top:12px; background:var(--panel2); }
+  .opt.first { border-color:var(--badge); }
+  .opt .row1 { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .opt .rname { font-size:16px; font-weight:650; }
+  .opt .cuisine { color:var(--dim); font-size:12.5px; }
+  .badge { background:color-mix(in srgb,var(--badge) 22%, transparent);
+    color:#c4b5fd; border:1px solid var(--badge); border-radius:999px;
+    padding:2px 9px; font-size:11.5px; font-weight:600; }
+  .why { margin-top:6px; font-size:14px; }
+  .why b { color:#ffd479; }              /* highlight the honesty-bearing copy */
+  .pitch { margin-top:5px; color:var(--dim); font-size:13px; }
+  .price { color:var(--dim); font-size:12.5px; }
+  details.cands { margin-top:16px; }
+  details.cands summary { cursor:pointer; color:var(--dim); font-size:13px; }
+  table { width:100%; border-collapse:collapse; margin-top:8px; font-size:13px; }
+  td,th { border-bottom:1px solid var(--line); padding:6px 8px; text-align:left; }
+  th { color:var(--dim); font-weight:500; }
+  /* side panel */
+  .side { position:sticky; top:64px; display:flex; flex-direction:column; gap:14px; }
+  .verdict { display:flex; gap:8px; }
+  .verdict button { flex:1; padding:12px 0; font-size:15px; font-weight:700;
+    border-radius:10px; border:1px solid var(--line); cursor:pointer; color:#0d0f13; }
+  .v-pass{ background:var(--pass);} .v-fail{ background:var(--fail);}
+  .v-defer{ background:var(--defer);}
+  .verdict button.ghost{ background:transparent; color:var(--dim); font-weight:500; }
+  .status { text-align:center; font-weight:700; padding:8px; border-radius:8px;
+    border:1px solid var(--line); }
+  .status.pass{ color:var(--pass);} .status.fail{ color:var(--fail);}
+  .status.defer{ color:var(--defer);} .status.none{ color:var(--dim); }
+  textarea { width:100%; min-height:96px; resize:vertical; background:var(--panel2);
+    color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:10px;
+    font:inherit; }
+  .nav { display:flex; gap:8px; }
+  .nav .btn { flex:1; text-align:center; }
+  .kbd { color:var(--dim); font-size:12px; line-height:1.9; }
+  .kbd code { background:var(--panel2); border:1px solid var(--line); border-radius:5px;
+    padding:1px 6px; color:var(--ink); }
+  .rubric { font-size:13px; color:var(--dim); }
+  .rubric h3 { color:var(--ink); font-size:13px; margin:0 0 6px; }
+  .rubric li { margin-bottom:5px; }
+  .progress { height:6px; background:var(--panel2); border-radius:999px; overflow:hidden; }
+  .progress > i { display:block; height:100%; background:var(--accent); width:0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Choice-Set Review</h1>
+  <span class="counter" id="counter">– / –</span>
+  <div class="progress" style="width:160px"><i id="pbar"></i></div>
+  <span class="counter" id="tally"></span>
+  <div class="spacer"></div>
+  <label class="counter" style="font-size:12px">jump
+    <input id="jump" placeholder="trace-03" /></label>
+  <button class="btn small" id="exportJson">Export JSON</button>
+  <button class="btn small" id="exportCsv">Export CSV</button>
+</header>
+
+<main>
+  <section class="card" id="trace"><!-- rendered --></section>
+
+  <aside class="side">
+    <div class="status none" id="status">unlabeled</div>
+    <div class="verdict">
+      <button class="v-pass" id="bPass">Pass</button>
+      <button class="v-fail" id="bFail">Fail</button>
+      <button class="v-defer" id="bDefer">Defer</button>
+    </div>
+    <div class="verdict"><button class="ghost" id="bClear" style="flex:1;padding:7px">Clear label</button></div>
+    <textarea id="notes" placeholder="What went right or wrong? (auto-saves)"></textarea>
+    <div class="nav">
+      <button class="btn" id="prev">← Prev</button>
+      <button class="btn" id="next">Next →</button>
+    </div>
+    <div class="card" style="padding:12px 14px">
+      <div class="rubric" id="rubric">
+        <h3>Pass if…</h3>
+        <ul>
+          <li>The 2–3 options genuinely <b>differ</b> (real spread), not near-duplicates.</li>
+          <li>Every frequency claim is <b>honest</b>: “you order X <i>most</i>” only for the #1 taste cuisine; “a lot” only for a top-taste one.</li>
+          <li>The <span class="badge">matches what you order</span> badge sits only on a real top-taste match — an out-of-taste place (Korean BBQ, German) is shown <b>neutrally</b>, never force-badged.</li>
+          <li>Picks are actually near the hotel; the pitch/dish makes sense.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="kbd">
+      <code>←</code>/<code>→</code> navigate · <code>1</code> Pass · <code>2</code> Fail ·
+      <code>D</code> Defer · <code>U</code> undo · <code>⌘/Ctrl+S</code> save ·
+      <code>⌘/Ctrl+↵</code> save & next
+    </div>
+  </aside>
+</main>
+
+<script src="traces.js"></script>
+<script>
+const KEY = "choiceset-review-v1";
+const T = (window.TRACES || []);
+let i = 0;
+let labels = JSON.parse(localStorage.getItem(KEY) || "{}");   // { id: {verdict, notes, ts} }
+let lastAction = null;                                        // for undo
+
+const $ = s => document.querySelector(s);
+const esc = s => (s==null?"":String(s)).replace(/[&<>"]/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// Bold the honesty-bearing phrases so a reviewer's eye lands on them.
+function markWhy(w){
+  return esc(w).replace(/\b(order [a-z]+ most|a lot|a cuisine you order often|closest open option|the closest open option to your taste)\b/gi,
+    m => "<b>"+m+"</b>");
+}
+
+function render(){
+  const t = T[i];
+  if(!t){ $("#trace").innerHTML = "<p>No traces loaded. Run <code>python -m evals.export_review_traces</code>.</p>"; return; }
+  const top = t.traveler.taste[0];
+  const chips = t.traveler.taste.map((c,idx)=>`<span class="chip ${idx<3?'top':''}">${esc(c)}</span>`).join("");
+  const opts = t.output.options.map((o,idx)=>`
+    <div class="opt ${idx===0?'first':''}">
+      <div class="row1">
+        <span class="rname">${esc(o.restaurant_name)}</span>
+        <span class="cuisine">${esc(o.cuisine_label)}</span>
+        ${o.badge?`<span class="badge">${esc(o.badge)}</span>`:""}
+        <span class="spacer" style="flex:1"></span>
+        <span class="price">${o.est_total!=null?"$"+o.est_total.toFixed(2):""}</span>
+      </div>
+      <div class="why">${markWhy(o.why)}</div>
+      ${o.dish_pitch?`<div class="pitch">${esc(o.dish_pitch)}</div>`:""}
+    </div>`).join("");
+  const cand = t.candidates.map(c=>`<tr><td>${esc(c.name)}</td>
+      <td>${esc(c.categories.join(", "))}</td><td>${c.distance_m} m</td></tr>`).join("");
+  $("#trace").innerHTML = `
+    <div class="scenario">${esc(t.scenario)} · ${esc(t.id)}</div>
+    <div class="trav"><span class="name">${esc(t.traveler.name)}</span>
+      <span class="hotel">${esc(t.hotel)}</span></div>
+    <div class="taste">Uber Eats taste: ${chips}</div>
+    <div class="lead">${esc(t.output.lead)}</div>
+    ${opts}
+    <details class="cands"><summary>All ${t.candidates.length} candidates the agent ranked (axis: ${esc(t.output.axis)})</summary>
+      <table><tr><th>Restaurant</th><th>Categories</th><th>Distance</th></tr>${cand}</table>
+    </details>`;
+  // side state
+  const lab = labels[t.id];
+  const v = lab?.verdict;
+  $("#status").className = "status " + (v||"none");
+  $("#status").textContent = v ? v.toUpperCase() : "unlabeled";
+  $("#notes").value = lab?.notes || "";
+  const done = Object.values(labels).filter(l=>l.verdict).length;
+  $("#counter").innerHTML = `<b>${i+1}</b> / ${T.length}`;
+  $("#tally").textContent = `${done} labeled · ${T.length-done} left`;
+  $("#pbar").style.width = (100*done/T.length)+"%";
+  [["bPass","pass"],["bFail","fail"],["bDefer","defer"]].forEach(([id,val])=>
+    $("#"+id).style.outline = v===val ? "2px solid #fff" : "none");
+}
+
+function save(){ localStorage.setItem(KEY, JSON.stringify(labels)); }
+function setVerdict(v){
+  const id = T[i].id;
+  lastAction = { id, prev: labels[id] ? {...labels[id]} : null };
+  labels[id] = { verdict:v, notes:$("#notes").value, ts:Date.now() };
+  save(); render();
+}
+function saveNotes(){
+  const id = T[i].id, l = labels[id] || {verdict:null};
+  labels[id] = {...l, notes:$("#notes").value, ts:Date.now()}; save();
+}
+function clearLabel(){ const id=T[i].id; lastAction={id,prev:labels[id]?{...labels[id]}:null};
+  delete labels[id]; save(); render(); }
+function undo(){ if(!lastAction) return; const {id,prev}=lastAction;
+  if(prev) labels[id]=prev; else delete labels[id]; lastAction=null; save(); render(); }
+function go(d){ i=Math.max(0,Math.min(T.length-1,i+d)); render(); }
+
+$("#bPass").onclick=()=>setVerdict("pass");
+$("#bFail").onclick=()=>setVerdict("fail");
+$("#bDefer").onclick=()=>setVerdict("defer");
+$("#bClear").onclick=clearLabel;
+$("#prev").onclick=()=>go(-1);
+$("#next").onclick=()=>go(1);
+$("#notes").addEventListener("input", saveNotes);
+$("#jump").addEventListener("change", e=>{
+  const idx=T.findIndex(t=>t.id===e.target.value.trim()); if(idx>=0){i=idx;render();} });
+
+function exportRows(){ return T.map(t=>({id:t.id, scenario:t.scenario,
+  traveler:t.traveler.name, verdict:labels[t.id]?.verdict||"", notes:labels[t.id]?.notes||""})); }
+function download(name, text, type){ const b=new Blob([text],{type});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=name; a.click(); }
+$("#exportJson").onclick=()=>download("labels.json", JSON.stringify(exportRows(),null,2), "application/json");
+$("#exportCsv").onclick=()=>{ const rows=exportRows();
+  const csv=[["id","scenario","traveler","verdict","notes"],
+    ...rows.map(r=>[r.id,r.scenario,r.traveler,r.verdict,r.notes]
+      .map(x=>`"${String(x).replace(/"/g,'""')}"`))].map(r=>r.join(",")).join("\n");
+  download("labels.csv", csv, "text/csv"); };
+
+document.addEventListener("keydown", e=>{
+  if(e.target.tagName==="TEXTAREA" || e.target.tagName==="INPUT"){
+    if((e.metaKey||e.ctrlKey) && e.key==="Enter"){ saveNotes(); go(1); }
+    if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==="s"){ e.preventDefault(); saveNotes(); }
+    return;
+  }
+  if((e.metaKey||e.ctrlKey) && e.key==="Enter"){ e.preventDefault(); go(1); return; }
+  if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==="s"){ e.preventDefault(); save(); return; }
+  switch(e.key){
+    case "ArrowLeft": go(-1); break;
+    case "ArrowRight": go(1); break;
+    case "1": setVerdict("pass"); break;
+    case "2": setVerdict("fail"); break;
+    case "d": case "D": setVerdict("defer"); break;
+    case "u": case "U": undo(); break;
+  }
+});
+
+render();
+</script>
+</body>
+</html>

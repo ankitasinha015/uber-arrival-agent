@@ -50,3 +50,6 @@ concierge_checkpoints.sqlite
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+
+evals/review/traces.js
+evals/review/labels.*
