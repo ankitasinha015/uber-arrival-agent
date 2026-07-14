@@ -273,7 +273,7 @@ function setBar(id){
   const p = PMETA[id];
   $('#avatar').textContent = p ? p.initial : 'A';
   $('#whoName').textContent = p ? p.name : 'Arrival agent';
-  $('#whoSub').textContent = p ? `${p.tag} · watching SFO arrival tonight` : 'watching SFO arrival · tonight';
+  $('#whoSub').textContent = p ? `${p.tag} · watching ${p.city||'your'} arrival tonight` : 'watching your arrival · tonight';
 }
 function showLogin(){
   if (es) es.close();

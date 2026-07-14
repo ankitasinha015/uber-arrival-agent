@@ -345,10 +345,42 @@ def _uber_ride(mode: str):
                  if b.get("accent") == "uber" or "Uber" in b.get("name", "")), None)
 
 
-def _signals_for(mode: str) -> dict:
+# Scheduled arrival (local, 24h) per mode. The ACTUAL arrival is this + the
+# delay (or the flight-change time), computed once and used everywhere — so the
+# header, the read chip, the gate line and the hotel note never disagree.
+_SCHED = {
+    "priya": "00:30", "marcus": "00:30", "olivia": "21:40", "lena": "22:55",
+    "new": "00:30", "seasoned": "00:30", "smooth": "21:40",
+}
+
+
+def _raw_signals(mode: str) -> dict:
     if mode in _PERSONAS:
         return _PERSONAS[mode]["signals"]
     return _SIGNALS.get(mode, _SIGNALS["new"])
+
+
+def _arrival_dt(mode: str) -> datetime:
+    """The actual arrival time: scheduled + delay, or the flight-change time."""
+    fc = _PERSONAS.get(mode, {}).get("flight_change")
+    if fc:
+        return datetime.strptime(fc["new_arrival"].strip().upper(), "%I:%M %p")
+    base = datetime.strptime(_SCHED.get(mode, "00:30"), "%H:%M")
+    return base + timedelta(minutes=_raw_signals(mode).get("delay_min", 0))
+
+
+def _arrival_str(mode: str) -> str:
+    """Display form, e.g. '1:15 AM'."""
+    return _arrival_dt(mode).strftime("%I:%M %p").lstrip("0")
+
+
+def _signals_for(mode: str) -> dict:
+    # a copy with the computed arrival stamped in, so read()/assess and the UI agree
+    s = dict(_raw_signals(mode))
+    dt = _arrival_dt(mode)
+    s["arrival_hour"] = dt.hour
+    s["arrival_hhmm"] = _arrival_str(mode)
+    return s
 
 
 def _taste_for(mode: str) -> list[str]:
@@ -365,7 +397,7 @@ def _is_seasoned(mode: str) -> bool:
 
 def personas() -> list[dict]:
     """The traveler roster for the login screen."""
-    return [{"id": k, "name": v["name"], "tag": v["tag"], "initial": v["initial"]}
+    return [{"id": k, "name": v["name"], "tag": v["tag"], "initial": v["initial"], "city": v["city"]}
             for k, v in _PERSONAS.items()]
 
 _DEP_INTRO_HIGH = "Before you head out — security's running long right now. Leave sooner:"
@@ -407,7 +439,7 @@ def _segments(memory, mode: str) -> list:
     fc = _PERSONAS.get(mode, {}).get("flight_change")
     city = loc["city"]
     delay = sig.get("delay_min", 0)
-    arr = fc["new_arrival"] if fc else ("9:40 PM" if not delay else "1:12 AM")
+    arr = _arrival_str(mode)   # single source of truth: scheduled + delay / change
     welcome = f"Welcome to {city} 👋"
     exit_line = (f"You're about {AIRPORT_EXIT_MIN} min from being out of the airport "
                  f"(deplane, then bags) — in your room by ~{arr}.")
@@ -471,16 +503,17 @@ def _trip_context(mode: str) -> dict:
     loc = _loc(mode)
     fc = _PERSONAS.get(mode, {}).get("flight_change")
     delay = sig.get("delay_min", 0)
+    arr = _arrival_str(mode)
     if fc:
-        arrival = f"~{fc['new_arrival']} (flight changed)"
+        arrival = f"~{arr} (flight changed)"
     elif not delay:
-        arrival = "~9:40 PM (on time)"
+        arrival = f"~{arr} (on time)"
     else:
-        arrival = f"~1:12 AM (delayed {delay}m)"
+        arrival = f"~{arr} (delayed {delay}m)"
     meta = _PERSONAS.get(mode)
     return {
         "flight": loc["flight"], "route": loc["route"], "hotel": loc["hotel"],
-        "arrival": arrival, "currency": loc["currency"],
+        "arrival": arrival, "currency": loc["currency"], "city": loc["city"],
         "changed": bool(fc), "new_flight": fc["to_flight"] if fc else None,
         "traveler": meta["name"] if meta else None,
         "initial": meta["initial"] if meta else "A",
@@ -494,23 +527,22 @@ def _context(mode: str = "new") -> dict:
     sig = _signals_for(mode)
     loc = _loc(mode)
     fc = _PERSONAS.get(mode, {}).get("flight_change")
-    if fc:
-        arrival_hhmm = fc["new_arrival"]
-    else:
-        arrival_hhmm = "9:40 PM" if not sig.get("delay_min") else "1:15 AM"
+    delay = sig.get("delay_min", 0)
+    arrival_hhmm = _arrival_str(mode)
     ctx = {"arrival_hhmm": arrival_hhmm, "city": loc["hotel"], "deliver_at": _DELIVER,
            "hotel_address": loc["hotel_address"],   # where the geo tool searches
            "currency": loc["currency"], "city_name": loc["city"],
            "time_of_day": f"{_ARRIVAL:%H:%M} (room arrival estimate)",
            "fatigue": "high late-night arrival after a flight",
            "pref": _taste_for(mode)}   # this traveler's Uber Eats cuisine order
-    if fc:  # flight was changed — the hotel note becomes an update, not a first heads-up
-        ctx["notify_kind"] = "changed"
+    # what the hotel note is ABOUT — drives the wording (changed / delayed / on-time)
+    ctx["notify_kind"] = "changed" if fc else ("delayed" if delay else "ontime")
+    if fc:
         ctx["new_flight"] = fc["to_flight"]
     # Action-first on a real disruption: the agent notifies the hotel itself and
     # reports back, no approval tap. A calm on-time trip (no delay/change) still
     # just offers.
-    ctx["auto_notify"] = bool(fc) or bool(sig.get("delay_min"))
+    ctx["auto_notify"] = bool(fc) or bool(delay)
     return ctx
 
 

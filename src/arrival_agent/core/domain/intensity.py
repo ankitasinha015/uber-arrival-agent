@@ -85,6 +85,8 @@ def read(moment, signals: dict | None) -> str:
     else:
         d = s.get("delay_min", 0) or 0
         bits.append(f"delayed {d} min" if d else "on time")
-        if s.get("arrival_hour") is not None:
+        if s.get("arrival_hhmm"):
+            bits.append(f"arriving {s['arrival_hhmm']}")
+        elif s.get("arrival_hour") is not None:
             bits.append(f"arriving {s['arrival_hour']:02d}:00")
     return " · ".join(bits) + f"  →  {assess(moment, signals).value.upper()}"
