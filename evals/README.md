@@ -1,64 +1,64 @@
 # Evals
 
-The agent's value is its *judgment*, and judgment is exactly what unit tests can't
-assert. So the agent's two judgment-heavy outputs get evals, using the three methods
-that actually work on LLM output.
-
-Run:
+The agent's value is its *judgment*, which unit tests can't assert. These evals were
+rebuilt after an **eval audit** (`/evals-skills:eval-audit`) that flagged real gaps —
+an unvalidated 1-5 judge, 3-example datasets, no error analysis. What's here now follows
+the fixes.
 
 ```bash
-python -m evals.run                  # offline: properties + extraction
-EVAL_LIVE=1 python -m evals.run      # + the LLM-as-judge quality score (needs a key)
+python -m evals.gen_synthetic --live   # generate the synthetic trace set (needs geo keys)
+python -m evals.run                    # scorecard: properties + extraction + validation
+python -m evals.validate               # just the TPR/TNR evaluator validation
+EVAL_LIVE=1 python -m evals.run        # + the binary LLM axis-spread judge (needs a key)
 ```
 
-## What's evaluated
+## The pipeline (post-audit)
 
-### 1. Choice-set design (`choice_set_eval.py`)
+**1. Synthetic data → error analysis (`gen_synthetic.py`, `synthetic/`).**
+No production traffic exists, so we generate diverse, failure-targeting traces (28
+booking emails across formats chosen to stress each parser regex; 12 dinner rankings
+across taste-profile × city, incl. international). `synthetic/FINDINGS.md` is the failure
+taxonomy the traces revealed — including a real bug (**cuisine-misclassification**: greedy
+"American" aliases tagged *Korean BBQ* as American), now fixed.
 
-The single LLM call that picks the axis and designs the 2-3 dinner options. Two methods:
+**2. Binary evaluators (`evaluators.py`).** One failure mode each, pass/fail (no 1-5
+Likert — hard to calibrate/validate). Code-based where objectively checkable:
 
-**Property-based (offline, a regression baseline).** Hard invariants that must hold on
-every choice set, run over the recorded golden outputs in `scenarios/cache/choice_set/`:
+| Evaluator | Kind | Checks |
+|---|---|---|
+| `cuisine_match` | code | a badged "matches what you order" pick's cuisine is supported by the restaurant's real categories |
+| `honest_copy` | code | "you order X most" only when X is the traveler's #1 cuisine |
+| `extract:<field>` | code | booking-email field extracted correctly |
+| `axis_spread` | **binary** LLM judge | do the choice-set options *meaningfully* differ along the stated axis? (replaces the old 1-5 quality score) |
 
-- axis is a real `ChoiceAxis`
-- 2-3 options, never 1 or 4
-- distinct restaurants (no dupes)
-- positive totals, a rationale on every option, a rationale for the set, a reasoned axis
+**3. Labeled gold (`gold.py`).** Human (domain-expert) labels — good **and** failing
+cases — so validation measures both TPR and TNR.
 
-If a prompt change starts producing 4 options or an off-enum axis, this goes red in CI
-(`tests/test_evals.py`). Current: **3/3 golden sets pass all invariants.**
+**4. Judge validation (`validate.py`).** TPR (of real failures, fraction caught) and TNR
+(of good outputs, fraction not falsely flagged) against the gold labels — not raw
+accuracy, which class imbalance makes misleading. Current:
 
-**LLM-as-judge (quality).** Correctness isn't the same as *good*. A judge model scores
-each set 1-5: do the options genuinely vary along their stated axis in a way useful to a
-tired late-night traveler? Quality can't be asserted, so we measure it and watch the mean.
+```
+cuisine_match   TPR 100%  TNR 100%   (n=11)
+honest_copy     TPR 100%  TNR 100%   (n=6)
+```
 
-Real run: **mean 4.3/5.** Two sets scored 5/5 ("clear progression from light snack to
-heavy feast"). One scored **3/5** with a specific critique: *"options span speed vs
-quality but price intrudes unexpectedly, and quality conflates with portion size."* That
-is the eval doing its job — it caught a muddy axis a pass/fail check never would.
+**5. Property invariants (`choice_set_eval.py`).** Code-based structural regression gate
+over the golden choice sets (axis in enum, 2-3 distinct options, rationales present).
 
-### 2. Itinerary extraction (`extraction_eval.py`)
+**6. CI gate (`tests/test_evals.py`).** Every run asserts: invariants hold, canonical
+extraction is exact, and each binary evaluator still aligns with its labels (TPR/TNR = 1).
+An evaluator that drifts goes red before it's trusted.
 
-Reading the booking email into `{flight_no, airport, hotel, scheduled_arrival}`.
-Field-level accuracy over emails in different formats. Offline runs the deterministic
-parser; the point is to **surface where it breaks**:
+## Known gaps (honest, tracked)
 
-- canonical format: **100%**
-- variant format ("Accommodation:" instead of "hotel:"): **75%** — misses `hotel`
-
-That miss is not a bug to hide, it's the finding: the deterministic parser handles the
-format it was built for; robust extraction across formats is what the LLM path
-(`use_llm=True`) is for. The eval quantifies the gap instead of pretending it's covered.
-
-## Why these three methods
-
-- **Property-based** catches structural regressions cheaply and deterministically — the
-  CI gate.
-- **LLM-as-judge** measures the subjective quality that invariants can't, and gives
-  actionable critique, not just a number.
-- **Accuracy-on-a-dataset** turns "does extraction work?" into a number that moves when
-  you change the prompt or the parser, and honestly shows what isn't covered yet.
-
-Judge scores drift a little run to run (it's a live model call). For a real gate you'd
-run each case N times and average, or pin a seed; here the mean over three sets is stable
-enough to trend.
+- **Judge validation is under-powered:** only 3 golden choice sets exist to validate the
+  `axis_spread` LLM judge against (target ~50 pass + 50 fail). Generating more needs the
+  live `choice_set` LLM call — the next data-generation step.
+- **Extraction is measured on the deterministic parser**; the actionable next eval is
+  running the same 28 emails through the LLM path (`use_llm=True`) to quantify per-format
+  recovery.
+- **Secondary honesty finding** (surfaced by the improved eval): a "matches what you order"
+  badge can land on a traveler's *lowest*-ranked cuisine when nothing better is open nearby
+  (e.g. Ramen #6 for a burger-lover). `honest_copy` catches false "most" but not a weak
+  "a lot" on a rarely-ordered cuisine — a candidate next evaluator + copy fix.

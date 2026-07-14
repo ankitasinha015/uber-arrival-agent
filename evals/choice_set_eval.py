@@ -1,23 +1,19 @@
-"""Eval: the choice-set design — the agent's core LLM judgment.
+"""Eval: the choice-set design — property invariants (the code-based regression gate).
 
-Two methods, the two that matter for an LLM output:
+Hard invariants EVERY choice set must satisfy, run over the recorded golden outputs:
+if a prompt change starts producing 4 options or an invalid axis, this goes red.
 
-  properties  Hard invariants EVERY choice set must satisfy, run over the recorded
-              golden outputs. This is a regression baseline: if a prompt change
-              starts producing 4 options or an invalid axis, this goes red.
-
-  judge       An LLM scores quality 1-5: do the options genuinely vary along their
-              stated axis in a way useful to a tired late-night traveler? Subjective
-              quality can't be asserted, so we measure it. Gated on EVAL_LIVE=1.
+The subjective "do the options vary along the axis" judgment is NOT here — after the
+eval-audit it's a BINARY judge in `evals.evaluators.judge_axis_spread` (the old 1-5
+Likert score was removed: hard to calibrate, hard to validate), validated in
+`evals.validate`.
 
 Run:  python -m evals.run          (properties, offline)
-      EVAL_LIVE=1 python -m evals.run   (+ the LLM judge, needs a key)
 """
 
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 from arrival_agent.core.contract import ChoiceAxis
@@ -52,33 +48,3 @@ def run_property_eval() -> list[dict]:
         checks = check_properties(cs)
         out.append({"case": name, "checks": checks, "passed": all(ok for _, ok in checks)})
     return out
-
-
-def judge_quality(cs: dict) -> dict:
-    """LLM-as-judge: score the set's quality 1-5. Live call."""
-    from arrival_agent.core.config import anthropic_key
-    import anthropic
-
-    opts = "; ".join(
-        f"{o['restaurant_name']} ({o.get('why_this_one', '')})" for o in cs.get("options", [])
-    )
-    prompt = (
-        f"A late-night airport-arrival agent designed a dinner choice set on the axis "
-        f"'{cs.get('axis')}'. The options: {opts}.\n\n"
-        "Rate 1-5 how well these options genuinely vary along that axis in a way useful "
-        "to a tired traveler who just landed after a delayed flight. 5 = a sharp, "
-        "meaningful spread; 1 = redundant or off-axis. Reply ONLY with JSON: "
-        '{"score": <int 1-5>, "reason": "<one short line>"}.'
-    )
-    client = anthropic.Anthropic(api_key=anthropic_key())
-    resp = client.messages.create(
-        model="claude-sonnet-4-5", max_tokens=150,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    text = "".join(getattr(b, "text", "") for b in resp.content)
-    m = re.search(r"\{.*\}", text, re.S)
-    return json.loads(m.group(0)) if m else {"score": None, "reason": text[:100]}
-
-
-def run_judge_eval() -> list[dict]:
-    return [{"case": name, **judge_quality(cs)} for name, cs in _load_golden()]

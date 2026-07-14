@@ -128,12 +128,15 @@ _UBER_EATS_PREF = ["Ramen", "Mexican", "Thai", "Burger", "American", "Pizza"]
 
 # How Foursquare's category names map onto the user's taste cuisines. Checked in
 # _UBER_EATS_PREF order, so the earliest (strongest) preference wins a match.
+# NOTE: the 'American' bucket used to include bbq/barbecue/grill/steak — weak signals
+# that mis-bucketed 'Korean BBQ', 'Bar & Grill', etc. as American (error-analysis
+# finding: cuisine-misclassification). Now American takes strong signals only.
 _CUISINE_ALIASES = {
     "Ramen": ["ramen", "noodle", "japanese"],
-    "Mexican": ["mexican", "taqueria", "taco", "cal"],
+    "Mexican": ["mexican", "taqueria", "taco", "tex-mex"],
     "Thai": ["thai"],
     "Burger": ["burger"],
-    "American": ["american", "diner", "bbq", "barbecue", "steak", "grill", "comfort"],
+    "American": ["american", "diner", "comfort", "steakhouse", "gastropub"],
     "Pizza": ["pizza", "pizzeria", "italian"],
 }
 

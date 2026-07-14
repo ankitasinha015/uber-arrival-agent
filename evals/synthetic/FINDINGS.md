@@ -59,3 +59,15 @@ Burger@NY/Berlin/SF).
 3. Turn these categories into **binary, single-failure judges** (`write-judge-prompt`):
    e.g. *"Is the badged top pick genuinely the traveler's cuisine? PASS/FAIL"*.
 4. Hand-label a held-out slice and validate the judges (TPR/TNR, `validate-evaluator`).
+
+## Update — after the eval-package fixes
+
+- **cuisine-misclassification: FIXED.** Tightened `_CUISINE_ALIASES` (dropped weak
+  bbq/grill/steak from "American"). Re-ran the 12 ranking traces: LA now resolves to
+  CoCo Ichibanya [Ramen] (a Japanese ramen chain), not "Korean BBQ [American]". The
+  `cuisine_match` evaluator validates this at TPR/TNR 100% and gates it in CI.
+- **honest_copy: 0 failures** across the regenerated traces (no false "most" claims).
+- **New secondary finding:** the "matches what you order" badge can land on a very
+  low-ranked cuisine (Ramen #6 for a burger-lover) when nothing better is open nearby,
+  with a stretchy "you order X a lot". Next: extend `honest_copy` to flag "a lot" on a
+  bottom-half cuisine, and soften the copy/badge for those cases.
