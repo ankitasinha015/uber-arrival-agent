@@ -6,11 +6,10 @@ primary_region = "sjc"
 
 [build]
 
-[env]
-  ARRIVAL_AGENT_CACHE = "replay"
+# Set FOURSQUARE_API_KEY and MAPS_API_KEY via `fly secrets set` for the live concierge.
 
 [http_service]
-  internal_port = 8080
+  internal_port = 7860
   force_https = true
   auto_stop_machines = "stop"
   auto_start_machines = true

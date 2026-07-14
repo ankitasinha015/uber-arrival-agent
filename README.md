@@ -1,3 +1,14 @@
+---
+title: Uber Arrival Agent
+emoji: 🛬
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+short_description: Travel Mode × Eats trip concierge — a live agent demo
+---
+
 # Uber Arrival Agent
 
 An agent at the seam between **Travel Mode** and **Eats**. You're flying somewhere

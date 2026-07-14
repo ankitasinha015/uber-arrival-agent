@@ -153,16 +153,31 @@ async def concierge_stream(run_id: str):
         if not run.started:
             run.started = True
             asyncio.create_task(concierge.drive(run))
+        # Proxies/CDNs (e.g. a Cloudflare tunnel) buffer a streamed response until a
+        # few KB accrue, which stalls SSE — events sit at the edge and never reach the
+        # browser. A padding comment past that threshold forces an immediate flush, and
+        # a keepalive on idle keeps the stream flushing. Harmless locally (comments are
+        # ignored by EventSource).
+        yield ":" + " " * 2048 + "\n\n"
         yield _sse("open", {"run_id": run.run_id})
         while True:
-            kind, payload = await run.queue.get()
+            try:
+                kind, payload = await asyncio.wait_for(run.queue.get(), timeout=15)
+            except asyncio.TimeoutError:
+                yield ": keepalive\n\n"
+                continue
             if kind is concierge._CLOSE:
                 break
             yield _sse(kind, payload)
 
     return StreamingResponse(
         gen(), media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        # no-transform stops Cloudflare (and other CDNs) from compressing the stream,
+        # which is what makes them buffer SSE; X-Accel-Buffering covers nginx-style
+        # proxies. Together with the padding+keepalive in gen(), the stream flushes
+        # through a public tunnel instead of stalling at the edge.
+        headers={"Cache-Control": "no-cache, no-transform",
+                 "X-Accel-Buffering": "no", "Content-Encoding": "identity"},
     )
 
 
