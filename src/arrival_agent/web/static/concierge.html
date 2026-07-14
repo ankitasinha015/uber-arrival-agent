@@ -134,9 +134,33 @@ let runId = null, es = null, awaitingId = null;
 function scroll(){ thread.scrollTop = thread.scrollHeight; }
 function el(cls, html){ const d = document.createElement('div'); d.className = cls; if(html!=null) d.innerHTML = html; thread.appendChild(d); scroll(); return d; }
 
+// The composer only means something when the agent is paused at a decision — the
+// /say endpoint interprets your words against THAT pause. Reflect that in the UI so
+// typing between beats isn't a silent no-op: enabled + a contextual hint at a pause,
+// disabled + an honest placeholder otherwise.
+const SAY_HINTS = {
+  ask_hotel:  'Reply in words — e.g. “yes, tell them” — or tap above',
+  send:       'Type “send”, or your edits — or tap above',
+  pick:       'Name a dish or spot — e.g. “the ramen” — or tap a card',
+  book_ride:  '“book it” or “I’ll sort my own” — or tap above',
+  confirm_dish:'“order it” or “back to options” — or tap above',
+  snooze:     '“got it” — or tap above',
+};
+function setComposer(active, hint){
+  const say = $('#say'), btn = $('#sayBtn');
+  say.disabled = !active; btn.disabled = !active;
+  say.placeholder = active ? (hint || 'Reply in words, or use the buttons above…')
+                           : 'The agent will ask when it needs a decision…';
+  say.style.opacity = active ? '1' : '.45';
+  btn.style.background = active ? '#0066ff' : '#c9c9c9';
+  btn.style.cursor = active ? 'pointer' : 'default';
+  if (active) setTimeout(() => say.focus(), 0);
+}
+
 async function respond(actionId, body){
   if (awaitingId !== actionId) return;
   awaitingId = null;
+  setComposer(false);   // decision made — nothing to type until the next pause
   await fetch(`/api/concierge/${runId}/respond`, {method:'POST',
     headers:{'content-type':'application/json'}, body: JSON.stringify(body)});
 }
@@ -157,6 +181,7 @@ function renderCtx(c){
 
 function renderTodo(d){
   awaitingId = d.action_id;
+  setComposer(true, SAY_HINTS[d.kind]);   // a decision is on the table — you can reply in words
   const p = d.payload || {};
   if (p.note) el('bubble', esc(p.note));   // the agent's reply to a refinement / recovery
   if (d.kind === 'ask_hotel'){
@@ -319,6 +344,7 @@ $('#switch').onclick = showLogin;
 let rebootT = null;
 function start(){
   thread.innerHTML = '';
+  setComposer(false);   // starts idle; enabled when the agent reaches a decision
   clearTimeout(rebootT);
   fetch(`/api/concierge/run?mode=${mode}`, {method:'POST'}).then(r=>r.json()).then(r=>{
     runId = r.run_id;
@@ -351,7 +377,7 @@ function start(){
       if (sent) parts.push('hotel notified');
       el('card done').innerHTML = `<div class="done"><h3>All set.</h3>
         <p>${parts.length ? parts.join(' · ')+'.' : 'Handled what you asked for.'}</p></div>`;
-      ended = true; es.close();
+      ended = true; setComposer(false); es.close();
     });
     es.addEventListener('error', e => { try{ el('bubble', 'Something went wrong: '+esc(JSON.parse(e.data).message)); }catch(_){} });
   });
@@ -359,9 +385,16 @@ function start(){
 async function say(){
   const inp = $('#say'); const text = (inp.value || '').trim();
   if (!text || !runId) return;
+  if (!awaitingId){   // no decision open — say so instead of a silent no-op
+    el('bubble', "I'm on it — I'll ask here the moment there's something for you to decide.");
+    return;
+  }
   inp.value = '';
-  await fetch(`/api/concierge/${runId}/say`, {method:'POST',
+  const r = await fetch(`/api/concierge/${runId}/say`, {method:'POST',
     headers:{'content-type':'application/json'}, body: JSON.stringify({text})});
+  if (r.ok){ awaitingId = null; setComposer(false); }
+  else { inp.value = text;   // keep their text; the pause just isn't ready yet
+    el('bubble', "I can only take a reply when there's a decision on the table — try the buttons above."); }
 }
 $('#sayBtn').onclick = say;
 $('#say').addEventListener('keydown', e => { if (e.key === 'Enter') say(); });

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
@@ -725,6 +726,42 @@ def parse_intent(text: str, kind: str) -> dict:
     return {"decision": "refine", "text": text}  # stray text -> handler re-pauses with a hint
 
 
+# Generic words in restaurant names that shouldn't, on their own, select an option.
+_RNAME_STOP = {"the", "pizza", "bar", "grill", "restaurant", "kitchen", "cafe", "co",
+               "house", "steak", "and", "pizzeria", "room", "your"}
+_ORDINALS = {"first": 0, "1st": 0, "one": 0, "second": 1, "2nd": 1, "two": 1,
+             "third": 2, "3rd": 2, "three": 2, "fourth": 3, "4th": 3, "four": 3}
+
+
+def _match_option(text: str, options: list) -> dict | None:
+    """Direct selection of a dinner option by free text: the restaurant's name, one of
+    its dishes, or an ordinal ('the first one', 'number 2'). Returns the matched option
+    or None (so the caller can fall back to refine). This is what makes 'the parlor
+    pizza bar' pick it, instead of being read as a 'more pizza' refinement."""
+    t = (text or "").lower()
+    for o in options:                       # 1) full restaurant name appears in the text
+        nm = (o.get("restaurant_name") or "").lower()
+        if nm and nm in t:
+            return o
+    def _distinctive(s):    # significant words: 3+ letters, not a generic filler
+        return [w for w in re.findall(r"[a-z]+", (s or "").lower())
+                if len(w) >= 3 and w not in _RNAME_STOP]
+
+    for o in options:                       # 2) a distinctive name token, or a dish word
+        toks = _distinctive(o.get("restaurant_name"))
+        for d in (o.get("items") or []):
+            toks += _distinctive(d)
+        if any(re.search(rf"\b{re.escape(w)}\b", t) for w in toks):
+            return o
+    for word, idx in _ORDINALS.items():     # 3) ordinal / position
+        if re.search(rf"\b{word}\b", t) and idx < len(options):
+            return options[idx]
+    m = re.search(r"\b(?:number|option|#)\s*(\d)\b", t)   # 'number 2', 'option 3'
+    if m and 1 <= int(m.group(1)) <= len(options):
+        return options[int(m.group(1)) - 1]
+    return None
+
+
 @dataclass
 class ConciergeRun:
     run_id: str
@@ -790,7 +827,14 @@ class ConciergeRegistry:
         run = self._runs.get(run_id)
         if run is None or not run.awaiting or run.current is None:
             return False
-        kind = run.current["kind"] if isinstance(run.current, dict) else run.current.kind
+        cur = run.current
+        kind = cur["kind"] if isinstance(cur, dict) else cur.kind
+        if kind == "pick":   # try a direct restaurant/dish/ordinal selection first
+            payload = cur.get("payload") if isinstance(cur, dict) else getattr(cur, "payload", {})
+            opt = _match_option(text, (payload or {}).get("options", []))
+            if opt:
+                return self.submit(run_id, {"decision": "pick",
+                                            "option_id": opt.get("option_id"), "text": text})
         return self.submit(run_id, parse_intent(text, kind))
 
     def discard(self, run_id: str) -> None:
