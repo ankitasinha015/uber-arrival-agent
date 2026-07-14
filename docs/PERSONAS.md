@@ -66,19 +66,19 @@ Trips/yr 8 · Eats: Mexican, Pizza · Arrival: on time, early evening
 - **Quote:** *"It told me I was in early and on track, made one small offer, and
   then got out of my way. Perfect."*
 
-## 04 · Dev Patel — The Red-Eye Arriver  `TRIP·DELAY`  ·  intensity **HIGH** (recovery)
+## 04 · Dev Patel — The Red-Eye Arriver  `TRIP·CHANGE`  ·  intensity **HIGH** (recovery)
 
-38 · engineer · EWR → SFO · lands San Francisco · flight slips 45 min, now 1:12 a.m.
-Trips/yr 15 · Eats: Ramen, Mexican · Arrival: delayed, past midnight
+38 · engineer · EWR → SFO · lands San Francisco · **airline rebooked him** (UA 517 → UA 892), now 2:40 a.m.
+Trips/yr 15 · Eats: Ramen, Mexican · Arrival: changed, past midnight
 
-- **Job:** "It's late and I'm wrecked — *make the landing soft*." Check-in is
-  about to close and he has nothing left to problem-solve with.
-- **Agent:** The delay flow at full tilt. It re-estimates arrival to 1:12 a.m.,
-  drafts a hold-my-room note for him to approve or edit, and re-notifies the
-  hotel if the time moves more than 30 min. On arrival: welcome, an honest
-  time-to-exit, and his most-ordered ramen sent to the room so food beats him
-  upstairs.
-  `re-estimate arrival` · `notify hotel` · `re-notify >30min` · `dinner to room`
+- **Job:** "It's late and my flight got changed — *make the landing soft*."
+  Check-in is about to close and he has nothing left to problem-solve with.
+- **Agent:** The flight-change flow at full tilt. It detects the airline moved
+  him off UA 517 onto UA 892, re-estimates arrival to 2:40 a.m., and offers to
+  **update the hotel** — a change-aware note ("my flight was changed, now on
+  UA 892…") he approves or edits. On arrival: welcome, an honest time-to-exit,
+  and his most-ordered ramen to the room so food beats him upstairs.
+  `detect flight change` · `update hotel (new flight + time)` · `re-estimate arrival` · `dinner to room`
 - **Quote:** *"I landed at 1 a.m. to a held room and ramen already on its way
   up. I nearly cried."*
 

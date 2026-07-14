@@ -66,6 +66,14 @@ class HeadsUpHandler:
 
 def _default_draft(context: dict) -> str:
     when = context.get("arrival_hhmm", "late tonight")
+    if context.get("notify_kind") == "changed":
+        flight = context.get("new_flight")
+        on = f" (now on {flight})" if flight else ""
+        return (
+            f"Hello, my flight was changed{on} and I'll now be arriving later than "
+            f"planned tonight, around {when}. Could you please hold my room and note the "
+            f"updated arrival so check-in is ready when I get there? Thank you very much."
+        )
     return (
         f"Hello, I have a reservation arriving later than planned tonight, around "
         f"{when}. Could you please hold my room and note the late arrival so check-in "
@@ -85,8 +93,12 @@ class NotifyHotelHandler:
 
     def _ask(self, context: dict, hint: str | None = None) -> Prepared:
         when = context.get("arrival_hhmm", "late tonight")
+        if context.get("notify_kind") == "changed":
+            question = f"Your flight was changed — want me to update the hotel with your new arrival, around {when}?"
+        else:
+            question = f"Your flight's delayed — want me to let the hotel know you'll arrive around {when}?"
         payload = {
-            "question": f"Your flight's delayed — want me to let the hotel know you'll arrive around {when}?",
+            "question": question,
             "arrival_hhmm": when,
         }
         if hint:

@@ -125,7 +125,8 @@ let CUR = '$';
 function renderCtx(c){
   if (c.currency) CUR = c.currency;
   const box = $('#ctx'); box.hidden = false;
-  const live = `security ${c.security_min}m · ${c.delay_min ? ('delayed '+c.delay_min+'m') : 'on time'}`;
+  const status = c.changed ? ('flight changed → '+esc(c.new_flight||'')) : (c.delay_min ? ('delayed '+c.delay_min+'m') : 'on time');
+  const live = `security ${c.security_min}m · ${status}`;
   box.innerHTML =
     `<div class="ctx-row"><span>✈️ ${esc(c.flight)} · ${esc(c.route)}</span><span>🏨 ${esc(c.hotel)}</span></div>`+
     `<div class="ctx-row"><span>🕐 arrives ${esc(c.arrival)}</span><span class="ctx-live">live · ${esc(live)}</span></div>`+
