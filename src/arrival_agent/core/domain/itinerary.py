@@ -65,8 +65,10 @@ def _parse_arrival(text: str, *, year: int = 2026) -> datetime | None:
 
 def _extract_via_parse(email_text: str) -> dict:
     """Deterministic parse of the booking-email format. The demo path."""
-    flight = re.search(r"\b([A-Z]{2})\s?(\d{2,4})\b", email_text)
-    arr_airport = re.search(r"->\s*[^(]+\(([A-Z]{3})\)", email_text)
+    # airline code may contain a digit (JetBlue 'B6', 'F9') — error-analysis finding.
+    flight = re.search(r"\b([A-Z][A-Z0-9])\s?(\d{2,4})\b", email_text)
+    # accept both ASCII '->' and the unicode arrow '→'
+    arr_airport = re.search(r"(?:->|→)\s*[^(]+\(([A-Z]{3})\)", email_text)
     hotel = re.search(r"hotel:\s*\n\s*(.+)", email_text, re.I)
     arrival = _parse_arrival(email_text)
     return {

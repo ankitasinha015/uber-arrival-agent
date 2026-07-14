@@ -44,6 +44,18 @@ _TRIPS = [
     {"airline": "American", "fno": "AA 118", "oc": "New York", "ocode": "JFK",
      "dc": "Chicago", "dcode": "ORD", "hotel": "The Langham, Chicago",
      "mon": 8, "day": 9, "h": 12, "m": 30, "ap": "AM"},
+    {"airline": "JetBlue", "fno": "B6 615", "oc": "Boston", "ocode": "BOS",
+     "dc": "Fort Lauderdale", "dcode": "FLL", "hotel": "W Fort Lauderdale",
+     "mon": 3, "day": 4, "h": 9, "m": 55, "ap": "PM"},
+    {"airline": "Air Canada", "fno": "AC 759", "oc": "Toronto", "ocode": "YYZ",
+     "dc": "San Francisco", "dcode": "SFO", "hotel": "Hotel Zephyr, San Francisco",
+     "mon": 9, "day": 18, "h": 1, "m": 20, "ap": "AM"},
+    {"airline": "Southwest", "fno": "WN 44", "oc": "Chicago", "ocode": "MDW",
+     "dc": "Denver", "dcode": "DEN", "hotel": "The Crawford Hotel, Denver",
+     "mon": 4, "day": 27, "h": 10, "m": 5, "ap": "PM"},
+    {"airline": "British Airways", "fno": "BA 285", "oc": "London", "ocode": "LHR",
+     "dc": "San Francisco", "dcode": "SFO", "hotel": "Hotel Zephyr, San Francisco",
+     "mon": 10, "day": 2, "h": 8, "m": 45, "ap": "PM"},
 ]
 
 
@@ -144,12 +156,16 @@ _TASTES = {
     "mexican-dominant": ["Mexican", "Thai", "American", "Pizza", "Burger", "Ramen"],
     "ramen-niche":      ["Ramen", "Thai", "Mexican", "Burger", "American", "Pizza"],
     "burger-common":    ["Burger", "American", "Pizza", "Mexican", "Thai", "Ramen"],
+    "thai-forward":     ["Thai", "Ramen", "Pizza", "Mexican", "American", "Burger"],
+    "pizza-lover":      ["Pizza", "American", "Burger", "Mexican", "Thai", "Ramen"],
 }
 _HOTELS = [
     ("New York", "The New Yorker Hotel, 481 8th Ave, New York, NY 10001", "$"),
     ("Berlin (intl)", "Hotel Zoo Berlin, Kurfürstendamm 25, 10719 Berlin, Germany", "€"),
     ("Los Angeles", "The LINE Hotel, 3515 Wilshire Blvd, Los Angeles, CA 90010", "$"),
     ("San Francisco", "Hotel Zephyr, 250 Beach St, San Francisco, CA 94133", "$"),
+    ("Chicago", "The Langham, 330 N Wabash Ave, Chicago, IL 60611", "$"),
+    ("Miami", "The Betsy Hotel, 1440 Ocean Dr, Miami Beach, FL 33139", "$"),
 ]
 
 
@@ -162,6 +178,7 @@ def gen_ranking():
                    "currency": cur, "deliver_at": C._DELIVER, "traveler_id": None}
             cands = C._arrival_find(ctx)
             cs = C._arrival_design(cands, ctx)
+            cats = {c["restaurant_name"]: c.get("categories", []) for c in cands}
             rows.append({
                 "id": f"{taste_name}@{city}", "surface": "ranking",
                 "taste_profile": taste_name, "taste": taste, "city": city,
@@ -169,7 +186,8 @@ def gen_ranking():
                                   for c in cands[:6]],
                 "top1_cuisine_overall": taste[0],
                 "options": [{"name": o.restaurant_name, "cuisine": (o.cuisine_tags or [""])[0],
-                             "why": o.why_this_one, "badge": o.badge, "dish": o.items[0]}
+                             "why": o.why_this_one, "badge": o.badge, "dish": o.items[0],
+                             "categories": cats.get(o.restaurant_name, [])}
                             for o in cs.options],
             })
     (_OUT / "ranking_traces.jsonl").write_text(
