@@ -455,7 +455,7 @@ def _segments(memory, mode: str) -> list:
                       f"land around {arr}. I'll give the hotel a heads-up so your room's held.")
     smooth_arrival = [welcome,
                       "You're in early tonight — everything's on track, kitchens are open and "
-                      "the line was clear. One optional thing, then I'll leave you be:"]
+                      "the line was clear. I'll let the hotel know your ETA so check-in's ready:"]
     segs = []
 
     dep = _departure_segment(sig, memory)
@@ -475,10 +475,15 @@ def _segments(memory, mode: str) -> list:
             moment=Moment.ARRIVAL, reasoning="dinner near the hotel",
             items=[curate_actions(Moment.ARRIVAL).items[0]], intensity="high", read="")))
     else:
-        # calm arrival: welcome + one optional hotel offer, no dinner
+        # calm on-time arrival: welcome, the agent quietly gives the hotel your ETA
+        # (action-first), then a dinner offer since kitchens are open at this hour.
         segs.append((smooth_arrival, ActionList(
             moment=Moment.DELAY, reasoning="all good", items=_hotel_list(memory),
             intensity="low", read="")))
+        segs.append(([f"You're in around {arr} — plenty of time for dinner if you want it."],
+                     ActionList(moment=Moment.ARRIVAL, reasoning="dinner near the hotel",
+                                items=[curate_actions(Moment.ARRIVAL).items[0]],
+                                intensity="low", read="")))
     return segs
 
 
@@ -540,10 +545,9 @@ def _context(mode: str = "new") -> dict:
     ctx["notify_kind"] = "changed" if fc else ("delayed" if delay else "ontime")
     if fc:
         ctx["new_flight"] = fc["to_flight"]
-    # Action-first on a real disruption: the agent notifies the hotel itself and
-    # reports back, no approval tap. A calm on-time trip (no delay/change) still
-    # just offers.
-    ctx["auto_notify"] = bool(fc) or bool(delay)
+    # Action-first, always: the agent notifies the hotel itself and reports back —
+    # no approval tap, whether the trip is delayed, changed, or on time.
+    ctx["auto_notify"] = True
     return ctx
 
 
@@ -666,10 +670,14 @@ def _pause_payload(step: Pause) -> dict:
 def _acted_payload(v: dict) -> dict:
     """What the agent did on its own — shown to the traveler after the fact."""
     when = v.get("when") or "later tonight"
-    if v.get("kind") == "changed":
+    kind = v.get("kind")
+    if kind == "changed":
         text = (f"✅ Done — I've updated the hotel about your flight change"
                 f"{' (now ' + v['new_flight'] + ')' if v.get('new_flight') else ''}. "
                 f"They'll hold your room for your new arrival, ~{when}.")
+    elif kind == "ontime":
+        text = (f"✅ Done — I gave the hotel your ETA (~{when}) so check-in's "
+                f"quick when you get there.")
     else:
         text = (f"✅ Done — I've let the hotel know you'll arrive around ~{when}, "
                 f"so they'll hold your room.")
