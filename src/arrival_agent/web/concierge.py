@@ -333,9 +333,9 @@ _SEED_TRAVELERS = {
                "hotel_address": "The Langham, 330 N Wabash Ave, Chicago, IL 60611",
                "flight": "UA 512", "route": "EWR → ORD",
                "bookings": [
-                   {"name": "Meet & Greet — airport assist (ORD)", "icon": "🧑‍✈️", "primary": True,
-                    "did": "updated your greeter with the new arrival",
-                    "confirm": "MG-3307", "at": "greeter meets you at the gate with a nameboard"},
+                   {"name": "Meet & Greet — airport pickup (ORD)", "icon": "🧑‍✈️", "primary": True,
+                    "did": "updated your greeter with the new arrival time",
+                    "confirm": "MG-3307", "at": "greeter meets you at the gate and drives you to The Langham"},
                ],
                "signals": {"delay_min": 45, "arrival_hour": 1,  "security_wait_min": 45, "pre_flight_min": 120, "security_fresh": True}},
     "marcus": {"name": "Marcus Boyd",    "tag": "Road warrior",      "initial": "M", "seasoned": True,
@@ -434,6 +434,28 @@ def _rental_car(mode: str):
     agent must NOT also book an Uber — one way to the hotel, not two."""
     bookings, _ = _trip_extras(mode)
     return next((b for b in bookings if "rental" in b.get("name", "").lower()), None)
+
+
+# A greeter / pickup / car-service already gets the traveler out of the airport.
+_PICKUP_KEYWORDS = ("meet & greet", "meet and greet", "greeter", "pickup", "pick-up",
+                    "pick up", "car service", "chauffeur", "airport assist", "driver")
+
+
+def _ground_pickup(mode: str):
+    """A pre-arranged greeter / pickup / car service that already covers getting the
+    traveler out of the airport and to the hotel — so the agent must NOT offer to book
+    an Uber on top of it. (A pre-booked Uber is handled by `_uber_ride`, a rental by
+    `_rental_car`; this catches the human-assist arrangements they miss — e.g. Priya's
+    Meet & Greet.) The agent knows this from the trip's own bookings; offering a ride
+    anyway is the agent contradicting data it already has."""
+    bookings, _ = _trip_extras(mode)
+    for b in bookings:
+        name = b.get("name", "").lower()
+        if b.get("accent") == "uber" or "rental" in name:
+            continue
+        if any(k in name for k in _PICKUP_KEYWORDS):
+            return b
+    return None
 
 
 # Scheduled arrival (local, 24h) per mode. The ACTUAL arrival is this + the
@@ -898,6 +920,7 @@ async def drive(run: ConciergeRun) -> None:
                 if actions.moment == Moment.ARRIVAL:
                     ride = _uber_ride(run.mode)
                     rental = _rental_car(run.mode)
+                    pickup = _ground_pickup(run.mode)
                     hotel = _loc(run.mode)["hotel"].split(",")[0]
                     if ride:
                         # a pickup was already re-booked at the gate — hand off to tracking
@@ -910,6 +933,11 @@ async def drive(run: ConciergeRun) -> None:
                         await _emit(run, "agent", {"text":
                             f"Your rental car's ready at the counter ({rental.get('confirm','held')}) — "
                             f"grab it and you're a short drive to {hotel}. No ride to book."})
+                    elif pickup:
+                        # someone's already meeting them — don't offer an Uber on top of it
+                        await _emit(run, "agent", {"text":
+                            f"No ride to book — your {pickup.get('name', 'airport pickup').split(' —')[0].lower()} "
+                            f"({pickup.get('confirm', 'confirmed')}) meets you at the gate and gets you to {hotel}."})
                     else:
                         # everyone else books their ride to the hotel now, one tap
                         pause = {"action_id": "book-ride", "kind": "book_ride",
