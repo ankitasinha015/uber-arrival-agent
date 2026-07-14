@@ -37,7 +37,11 @@ from arrival_agent.core.tools.email import send_hotel_note
 from arrival_agent.core.domain.recovery import recover_from_rejection
 
 _CLOSE = object()
-_HOTEL = "Hotel Zephyr, San Francisco"
+_HOTEL = "Hotel Zephyr, San Francisco"  # display name (notes, welcome copy)
+# Precise address for GEOCODING. "Hotel Zephyr, San Francisco" alone is too vague
+# — Mapbox resolves it 25 km away in the East Bay. The full street address pins it
+# to Fisherman's Wharf so "nearby" restaurants are actually nearby.
+_HOTEL_ADDRESS = "Hotel Zephyr, 250 Beach St, San Francisco, CA 94133"
 _ARRIVAL = datetime(2026, 5, 21, 1, 12, tzinfo=timezone(timedelta(hours=-7)))
 _DELIVER = _ARRIVAL + timedelta(minutes=20)
 
@@ -55,7 +59,7 @@ _FALLBACK_RESTAURANTS = [
 def _find(context):
     """Open places near the hotel — recorded/live if available, else deterministic."""
     try:
-        results = restaurants_mod.get_eats_options(_HOTEL, limit=10)
+        results = restaurants_mod.get_eats_options(_HOTEL_ADDRESS, limit=10)
         return results or _FALLBACK_RESTAURANTS
     except Exception:
         return _FALLBACK_RESTAURANTS
@@ -156,22 +160,31 @@ def _arrival_find(context):
     """Real restaurants near the hotel, pulled live from the location API each
     run. Falls back to a small honest set only if the live call fails."""
     try:
-        places = restaurants_mod.get_eats_options(_HOTEL, limit=12)
+        places = restaurants_mod.get_eats_options(_HOTEL_ADDRESS, limit=12)
         return places or _ARRIVAL_FALLBACK
     except Exception:
         return _ARRIVAL_FALLBACK
 
 
+_NEAR_M = 1500  # keep dinner genuinely close; taste never drags us far from the hotel
+
+
 def _arrival_design(candidates, context):
     """Take what's actually open near the hotel (live geo) and rank it by the
     cuisines the traveler orders most on Uber Eats. The match is taste↔location:
-    'you order ramen most → this ramen spot near you', never 'your usual here'."""
+    'you order ramen most → this ramen spot near you', never 'your usual here'.
+
+    Proximity gates first — we only taste-rank places that are actually near, so a
+    favourite cuisine 1.8 km away never beats a good option two blocks over."""
     def sort_key(r):
         cuisine = _match_cuisine(r.get("categories", []))
         rank = _UBER_EATS_PREF.index(cuisine) if cuisine else 99
         return (rank, r.get("distance_m") or 9999)
 
-    ordered = sorted(candidates, key=sort_key)
+    near = [r for r in candidates if (r.get("distance_m") or 9999) <= _NEAR_M]
+    if len(near) < 4:  # sparse area — fall back to the nearest handful, still close-first
+        near = sorted(candidates, key=lambda r: r.get("distance_m") or 9999)[:6]
+    ordered = sorted(near, key=sort_key)
     options = []
     for i, r in enumerate(ordered[:4]):
         name = r["restaurant_name"]
