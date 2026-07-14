@@ -6,16 +6,6 @@ room, finds food that's actually open, and at the right moment hands you two or
 three meaningfully different options. You take the final call by picking one — the
 agent does everything else.
 
-*Above: the agent waits while its arrival estimate is loose, surfaces a choice set
-once the timing is tight, and recovers live when a restaurant goes offline (watch the
-cards change — a dead option is dropped and a backup backfilled).*
-
-> **Live demo:** `https://<your-app>.fly.dev` — deploy with `fly deploy` (see
-> [Run it](#run-it)). The public demo replays recorded responses, so it's free,
-> deterministic, and needs no API keys.
-
----
-
 ## Trip Concierge
 
 The arrival agent above grew into a **trip concierge**: one agent watches the whole
