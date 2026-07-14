@@ -31,21 +31,25 @@ CUISINE_MATCH_GOLD = [
     ("Pizza", ["Steakhouse"], True, False, "steakhouse claimed as Pizza"),
 ]
 
-# (why, claimed_cuisine, pref, gold_pass, note)
+# Realistic 6-cuisine taste orders (full profiles, like the app uses).
+_MEX = ["Mexican", "Thai", "Pizza", "American", "Burger", "Ramen"]
+_BUR = ["Burger", "American", "Pizza", "Mexican", "Thai", "Ramen"]
+_RAM = ["Ramen", "Thai", "Mexican", "Burger", "American", "Pizza"]
+
+# (why, claimed_cuisine, pref, gold_pass, note). 'a lot' is honest only for a
+# top-half cuisine; 'most' only for #1.
 HONEST_COPY_GOLD = [
-    ("you order burger most on Uber Eats — 700 m away", "Burger",
-     ["Burger", "American", "Pizza"], True, "burger IS the #1 cuisine"),
-    ("you order ramen most on Uber Eats — 200 m away", "Ramen",
-     ["Ramen", "Thai", "Mexican"], True, "ramen IS #1"),
+    ("you order burger most on Uber Eats — 700 m away", "Burger", _BUR, True, "burger IS #1"),
+    ("you order ramen most on Uber Eats — 200 m away", "Ramen", _RAM, True, "ramen IS #1"),
     ("closest to your taste that's open near your hotel — you order pizza a lot — 300 m",
-     "Pizza", ["Mexican", "Thai", "Pizza"], True, "'a lot', not 'most' — honest"),
-    ("Pizza · a cuisine you order often — 500 m away", "Pizza",
-     ["Mexican", "Thai", "Pizza"], True, "no 'most' claim"),
+     "Pizza", _MEX, True, "'a lot', pizza is #3 of 6 (top half) — honest"),
+    ("Pizza · a cuisine you order often — 500 m away", "Pizza", _MEX, True, "no frequency claim"),
+    ("Ramen · the closest open option to your taste — 300 m away", "Ramen", _BUR, True,
+     "neutral copy for a #6 cuisine — no claim, OK"),
     # real failures:
-    ("you order pizza most on Uber Eats — 300 m away", "Pizza",
-     ["Mexican", "Thai", "Pizza"], False, "FALSE 'most': pizza is #3, not #1"),
-    ("you order american most on Uber Eats — 900 m away", "American",
-     ["Mexican", "Burger", "American"], False, "FALSE 'most': american is #3"),
+    ("you order pizza most on Uber Eats — 300 m away", "Pizza", _MEX, False, "FALSE 'most': pizza is #3"),
+    ("you order american most on Uber Eats — 900 m away", "American", _MEX, False, "FALSE 'most': american is #4"),
+    ("you order ramen a lot — 300 m away", "Ramen", _BUR, False, "FALSE 'a lot': ramen is #6 (bottom half)"),
 ]
 
 # Choice-set axis-spread labels for LLM-judge validation (needs EVAL_LIVE + a key).

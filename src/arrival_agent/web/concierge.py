@@ -244,19 +244,24 @@ def _arrival_design(candidates, context):
         matched = cuisine is not None
 
         top_match = i == 0 and matched
-        is_top_cuisine = bool(pref) and cuisine == pref[0]   # their #1 overall?
+        rank = pref.index(cuisine) if cuisine in (pref or []) else 99
+        # a "strong" match = a cuisine in the traveler's top third. Only then do we
+        # claim a taste match ('a lot') or badge it — otherwise the pick is honest
+        # about being a weak fallback (no frequency claim, no badge).
+        strong = matched and rank < max(2, len(pref) // 2)
         if matched:
             dish = _order_history_dish(context.get("traveler_id"), cuisine)
-            if top_match and is_top_cuisine:
+            if top_match and rank == 0:
                 why = f"you order {cuisine.lower()} most on Uber Eats — {dist_txt}"
-            elif top_match:
-                # their #1 cuisine isn't open nearby — this is the best available match
+            elif strong and top_match:
                 why = f"closest to your taste that's open near your hotel — you order {cuisine.lower()} a lot — {dist_txt}"
-            else:
+            elif strong:
                 why = f"{cuisine} · a cuisine you order often — {dist_txt}"
-            # dish-honest: this is YOUR most-ordered dish WITHIN this cuisine
+            else:  # a cuisine they order, but rarely — no 'a lot' / 'most' claim
+                why = f"{cuisine} · the closest open option to your taste — {dist_txt}"
             pitch = (f"Your go-to {cuisine.lower()} order is the {dish} — "
-                     f"I can get it from {name} and send it to your room.")
+                     f"I can get it from {name} and send it to your room." if strong else
+                     f"A {cuisine.lower()} pick near you is the {dish} — I can send it to your room.")
         else:
             dish = "the house special"
             why = f"{label} · {dist_txt}"
@@ -270,8 +275,8 @@ def _arrival_design(candidates, context):
         )
         o.est_delivery_at = context.get("deliver_at", _DELIVER)
         o.dish_pitch = pitch
-        # Badge only the top card, and only if it genuinely matches your taste.
-        if i == 0 and matched:
+        # Badge only the top card, and only when it's a STRONG (top-third) match.
+        if i == 0 and strong:
             o.badge = "matches what you order"
         options.append(o)
 

@@ -177,8 +177,40 @@ def gen_ranking():
     return rows
 
 
+# Compared on the unambiguous fields only. scheduled_arrival is excluded: the parser
+# hardcodes 2026/Pacific while the LLM *infers* year + timezone, so a correctly-read
+# time differs in representation — not a fair cross-path comparison.
+_CMP_FIELDS = ["flight_no", "airport", "hotel"]
+
+
+def compare_extraction_paths():
+    """Each synthetic email through BOTH the parser and the LLM path; per-format
+    accuracy on the unambiguous fields (flight_no / airport / hotel)."""
+    def _acc(got, exp):
+        return sum(got.get(f) == exp[f] for f in _CMP_FIELDS) / len(_CMP_FIELDS)
+
+    agg = {}
+    for t in _TRIPS:
+        exp = _expected(t)
+        for fmt_name, render in _FORMATS:
+            email = render(t)
+            p = _acc(extract_itinerary(email, use_llm=False), exp)
+            l = _acc(extract_itinerary(email, use_llm=True), exp)  # live LLM
+            agg.setdefault(fmt_name, {"p": [], "l": []})
+            agg[fmt_name]["p"].append(p)
+            agg[fmt_name]["l"].append(l)
+    return agg
+
+
 def main():
     live = "--live" in sys.argv
+    if "--llm-ext" in sys.argv:
+        print("EXTRACTION: parser vs LLM path, per format (flight/airport/hotel)")
+        agg = compare_extraction_paths()
+        for fmt, d in agg.items():
+            p = sum(d["p"]) / len(d["p"]); l = sum(d["l"]) / len(d["l"])
+            print(f"   {fmt:20} parser {p:.0%}  →  LLM {l:.0%}   ({'+' if l>=p else ''}{(l-p):.0%})")
+        return
     ext = gen_extraction()
     print(f"EXTRACTION: {len(ext)} traces -> evals/synthetic/extraction_traces.jsonl")
     by_fmt = {}

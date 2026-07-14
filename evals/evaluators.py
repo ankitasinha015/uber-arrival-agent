@@ -37,12 +37,18 @@ def check_cuisine_match(claimed_cuisine: str, categories: list[str], badged: boo
 # --- Ranking: copy honesty (code) ---------------------------------------------
 
 def check_honest_copy(why: str, claimed_cuisine: str, pref: list[str]):
-    """'you order X most' may only appear when X is the traveler's #1 cuisine.
-    'a lot' / other phrasings are always fine."""
-    if "most" not in (why or "").lower():
-        return ("honest_copy", True)
-    top = (pref or _UBER_EATS_PREF)[0]
-    return ("honest_copy", claimed_cuisine == top)
+    """Frequency claims must match the traveler's actual order rank:
+      'you order X most' → only when X is the #1 cuisine;
+      'you order X a lot' → only when X is in the top third of their taste.
+    Neutral phrasings ('closest open option') are always fine."""
+    w = (why or "").lower()
+    pref = pref or _UBER_EATS_PREF
+    rank = pref.index(claimed_cuisine) if claimed_cuisine in pref else 99
+    if "most" in w:
+        return ("honest_copy", rank == 0)
+    if "a lot" in w:
+        return ("honest_copy", rank < max(2, len(pref) // 2))
+    return ("honest_copy", True)
 
 
 # --- Extraction: field correctness (code) -------------------------------------

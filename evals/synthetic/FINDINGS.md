@@ -71,3 +71,30 @@ Burger@NY/Berlin/SF).
   low-ranked cuisine (Ramen #6 for a burger-lover) when nothing better is open nearby,
   with a stretchy "you order X a lot". Next: extend `honest_copy` to flag "a lot" on a
   bottom-half cuisine, and soften the copy/badge for those cases.
+
+## Update 2 — secondary honesty fix + LLM extraction recovery
+
+**Secondary honesty finding: FIXED.** The "matches what you order" badge and any
+frequency claim are now gated on a STRONG match (cuisine in the traveler's top half).
+Re-ran the 12 ranking traces: rank #1 → "you order X most" + badge; rank #2-3 →
+"you order X a lot" + badge; rank #4-6 → neutral "the closest open option to your
+taste", **no badge, no frequency claim**. `honest_copy` was extended to flag a weak
+"a lot" too, and re-validates at TPR 100% / TNR 100% (n=8).
+
+**Extraction — LLM path recovery (step 2).** Ran all 28 emails through `use_llm=True`
+and compared to the parser on the unambiguous fields (flight/airport/hotel; arrival
+excluded — the parser hardcodes 2026/Pacific while the LLM infers year+tz, so it's not
+a fair cross-path field):
+
+| Format | Parser | LLM | Δ |
+|---|---|---|---|
+| canonical | 100% | 100% | — |
+| arrow-unicode (`→`) | 67% | **100%** | +33% |
+| accommodation-label | 67% | **100%** | +33% |
+| 24h-time | 100% | 100% | — |
+| numeric-date | 100% | 100% | — |
+| terse-codes | 33% | **67%** | +33% |
+| inline-hotel | 67% | **100%** | +33% |
+
+The LLM recovers exactly the parser's format failures (unicode arrow → airport, alt
+labels / inline prose → hotel, partial on terse), justifying the LLM path per format.
