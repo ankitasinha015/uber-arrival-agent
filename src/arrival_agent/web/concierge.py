@@ -143,11 +143,13 @@ _ARRIVAL_FALLBACK = [
 ]
 
 
-def _match_cuisine(categories: list[str]) -> str | None:
-    """Best taste-cuisine this place matches, or None. Highest preference wins."""
+def _match_cuisine(categories: list[str], pref: list[str] | None = None) -> str | None:
+    """Best taste-cuisine this place matches, or None. Highest preference wins.
+    `pref` is the traveler's own cuisine order (per persona); defaults to the base."""
+    pref = pref or _UBER_EATS_PREF
     blob = " ".join(categories).lower()
-    for cuisine in _UBER_EATS_PREF:
-        if any(alias in blob for alias in _CUISINE_ALIASES[cuisine]):
+    for cuisine in pref:
+        if any(alias in blob for alias in _CUISINE_ALIASES.get(cuisine, [])):
             return cuisine
     return None
 
@@ -179,9 +181,10 @@ def _arrival_design(candidates, context):
 
     Proximity gates first — we only taste-rank places that are actually near, so a
     favourite cuisine 1.8 km away never beats a good option two blocks over."""
+    pref = context.get("pref") or _UBER_EATS_PREF   # this traveler's cuisine order
     def sort_key(r):
-        cuisine = _match_cuisine(r.get("categories", []))
-        rank = _UBER_EATS_PREF.index(cuisine) if cuisine else 99
+        cuisine = _match_cuisine(r.get("categories", []), pref)
+        rank = pref.index(cuisine) if cuisine in pref else 99
         return (rank, r.get("distance_m") or 9999)
 
     near = [r for r in candidates if (r.get("distance_m") or 9999) <= _NEAR_M]
@@ -191,7 +194,7 @@ def _arrival_design(candidates, context):
     options = []
     for i, r in enumerate(ordered[:4]):
         name = r["restaurant_name"]
-        cuisine = _match_cuisine(r.get("categories", []))
+        cuisine = _match_cuisine(r.get("categories", []), pref)
         label = cuisine or _cuisine_label(r.get("categories", []))
         dist = r.get("distance_m")
         dist_txt = f"{round(dist)} m away" if dist else "near your hotel"
@@ -242,6 +245,51 @@ _SIGNALS = {
     "smooth":   {"delay_min": 0,  "arrival_hour": 21, "security_wait_min": 8,  "pre_flight_min": 120, "security_fresh": True},
 }
 
+# The five selectable travelers behind the login screen. Each is a full scenario:
+# its own Uber Eats taste profile (cuisine order), trip signals that drive the
+# intensity dial, and memory state. Picking one runs its scenario end to end.
+_PERSONAS = {
+    "priya":  {"name": "Priya Nair",     "tag": "First-time flyer",  "initial": "P", "seasoned": False,
+               "taste": ["Thai", "Ramen", "Mexican", "Burger", "American", "Pizza"],
+               "signals": {"delay_min": 45, "arrival_hour": 1,  "security_wait_min": 45, "pre_flight_min": 120, "security_fresh": True}},
+    "marcus": {"name": "Marcus Boyd",    "tag": "Road warrior",      "initial": "M", "seasoned": True,
+               "taste": ["Burger", "American", "Pizza", "Mexican", "Thai", "Ramen"],
+               "signals": {"delay_min": 45, "arrival_hour": 1,  "security_wait_min": 45, "pre_flight_min": 120, "security_fresh": True}},
+    "olivia": {"name": "Olivia Chen",    "tag": "On-time optimist",  "initial": "O", "seasoned": False,
+               "taste": ["Mexican", "Pizza", "American", "Burger", "Thai", "Ramen"],
+               "signals": {"delay_min": 0,  "arrival_hour": 21, "security_wait_min": 8,  "pre_flight_min": 120, "security_fresh": True}},
+    "dev":    {"name": "Dev Patel",      "tag": "Red-eye arriver",   "initial": "D", "seasoned": False,
+               "taste": ["Ramen", "Mexican", "Thai", "Burger", "American", "Pizza"],
+               "signals": {"delay_min": 90, "arrival_hour": 1,  "security_wait_min": 30, "pre_flight_min": 120, "security_fresh": True}},
+    "lena":   {"name": "Lena Kowalski",  "tag": "Creature of habit", "initial": "L", "seasoned": False,
+               "taste": ["Mexican", "Thai", "Pizza", "American", "Burger", "Ramen"],
+               "signals": {"delay_min": 20, "arrival_hour": 23, "security_wait_min": 12, "pre_flight_min": 120, "security_fresh": True}},
+}
+
+
+def _signals_for(mode: str) -> dict:
+    if mode in _PERSONAS:
+        return _PERSONAS[mode]["signals"]
+    return _SIGNALS.get(mode, _SIGNALS["new"])
+
+
+def _taste_for(mode: str) -> list[str]:
+    if mode in _PERSONAS:
+        return _PERSONAS[mode]["taste"]
+    return _UBER_EATS_PREF
+
+
+def _is_seasoned(mode: str) -> bool:
+    if mode in _PERSONAS:
+        return _PERSONAS[mode]["seasoned"]
+    return mode == "seasoned"
+
+
+def personas() -> list[dict]:
+    """The traveler roster for the login screen."""
+    return [{"id": k, "name": v["name"], "tag": v["tag"], "initial": v["initial"]}
+            for k, v in _PERSONAS.items()]
+
 _DEP_INTRO_HIGH = "Before you head out — security's running long right now. Leave sooner:"
 _DEP_INTRO_LOW = "Before you head out — one thing worth doing:"
 _GATE_HOTEL_INTRO = ("Hours later, at the gate — your flight slipped 45 min, so you'll land around "
@@ -284,7 +332,7 @@ def _hotel_list(memory):
 def _segments(memory, mode: str) -> list:
     """The trip as a sequence of (intro, ActionList) moments, sized by the dial.
     intro may be a list of lines (the arrival welcome is several agent turns)."""
-    sig = _SIGNALS.get(mode, _SIGNALS["new"])
+    sig = _signals_for(mode)
     segs = []
 
     dep = _departure_segment(sig, memory)
@@ -328,11 +376,15 @@ def _handlers():
 
 def _trip_context(mode: str) -> dict:
     """The facts the agent pulled — shown at the top so you see its inputs."""
-    sig = _SIGNALS.get(mode, _SIGNALS["new"])
-    arrival = "~9:40 PM (on time)" if mode == "smooth" else "~1:12 AM (delayed 45m)"
+    sig = _signals_for(mode)
+    delay = sig.get("delay_min", 0)
+    arrival = "~9:40 PM (on time)" if not delay else f"~1:12 AM (delayed {delay}m)"
+    meta = _PERSONAS.get(mode)
     return {
         "flight": "UA 517", "route": "EWR → SFO", "hotel": "Hotel Zephyr, San Francisco",
         "arrival": arrival,
+        "traveler": meta["name"] if meta else None,
+        "initial": meta["initial"] if meta else "A",
         "security_min": sig.get("security_wait_min"),
         "delay_min": sig.get("delay_min", 0),
         "source": "from your booking email",
@@ -340,10 +392,12 @@ def _trip_context(mode: str) -> dict:
 
 
 def _context(mode: str = "new") -> dict:
-    arrival_hhmm = "9:40 PM" if mode == "smooth" else "1:15 AM"
+    sig = _signals_for(mode)
+    arrival_hhmm = "9:40 PM" if not sig.get("delay_min") else "1:15 AM"
     return {"arrival_hhmm": arrival_hhmm, "city": _HOTEL, "deliver_at": _DELIVER,
             "time_of_day": f"{_ARRIVAL:%H:%M} (room arrival estimate)",
-            "fatigue": "high late-night arrival after a flight"}
+            "fatigue": "high late-night arrival after a flight",
+            "pref": _taste_for(mode)}   # this traveler's Uber Eats cuisine order
 
 
 _CUISINES = ["ramen", "noodle", "thai", "mexican", "burger", "pizza", "sushi",
@@ -400,9 +454,9 @@ class ConciergeRegistry:
         self._runs: dict[str, ConciergeRun] = {}
 
     def create(self, mode: str = "new") -> ConciergeRun:
-        if mode not in _SIGNALS:
+        if mode not in _SIGNALS and mode not in _PERSONAS:
             mode = "new"
-        memory = seed_seasoned() if mode == "seasoned" else None
+        memory = seed_seasoned() if _is_seasoned(mode) else None
         run = ConciergeRun(
             run_id=uuid4().hex[:12], segments=_segments(memory, mode), mode=mode
         )

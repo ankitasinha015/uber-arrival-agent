@@ -68,17 +68,36 @@ body{margin:0;background:var(--bg);font-family:var(--sans);color:var(--ink);
 .dim{opacity:.5;pointer-events:none}
 .read{align-self:center;font-family:var(--mono);font-size:10px;color:var(--ink-faint);
   background:var(--bg);border:1px dashed var(--rule-soft);border-radius:6px;padding:3px 9px;letter-spacing:.2px}
+/* login / traveler select */
+.login{padding:18px 16px 20px;display:flex;flex-direction:column;gap:9px;flex:1;overflow-y:auto}
+.login[hidden]{display:none}   /* class sets display:flex, so re-hide explicitly */
+.login h2{margin:0;font-size:15.5px;letter-spacing:-.2px}
+.login .sub{margin:0 0 6px;font-size:11.5px;color:var(--ink-soft);line-height:1.4}
+.pcard{display:flex;align-items:center;gap:11px;border:1px solid var(--rule-soft);border-radius:12px;
+  padding:11px 12px;cursor:pointer;background:var(--surface);text-align:left;width:100%;font-family:inherit;
+  transition:border-color .12s,transform .06s}
+.pcard:hover{border-color:var(--ink)}
+.pcard:active{transform:scale(.99)}
+.pcard .pav{width:36px;height:36px;border-radius:50%;background:var(--ink);color:#fff;flex:none;
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px}
+.pcard .pbody{min-width:0}
+.pcard .pnm{font-size:13.5px;font-weight:650;color:var(--ink)}
+.pcard .ptg{font-size:11px;color:var(--ink-soft);margin-top:1px}
+.pcard .parr{margin-left:auto;color:var(--ink-faint);font-size:16px;flex:none}
+.switch{margin-left:auto;font-size:10.5px;color:var(--accent);background:none;border:none;cursor:pointer;font-family:inherit}
 </style>
 </head>
 <body>
 <div class="phone">
   <div class="bar">
-    <div class="avatar">A</div>
-    <div class="who"><b>Arrival agent</b><span>watching SFO arrival · tonight</span></div>
+    <div class="avatar" id="avatar">A</div>
+    <div class="who"><b id="whoName">Arrival agent</b><span id="whoSub">watching SFO arrival · tonight</span></div>
+    <button class="switch" id="switch" hidden>↺ Switch traveler</button>
   </div>
+  <div class="login" id="login" hidden></div>
   <div class="ctx" id="ctx" hidden></div>
   <div class="thread" id="thread"></div>
-  <div class="foot" style="display:flex;gap:8px;align-items:center">
+  <div class="foot" id="foot" style="display:flex;gap:8px;align-items:center">
     <input id="say" autocomplete="off" placeholder="Ask the agent anything…"
       style="flex:1;border:1px solid var(--rule,#e2e2e2);border-radius:18px;padding:9px 13px;font-size:13px;font-family:inherit;outline:none">
     <button id="sayBtn" aria-label="send"
@@ -183,8 +202,48 @@ function renderTodo(d){
 function markDone(card){ card.classList.add('dim'); }
 
 const VERB = {yes:'Yes, tell the hotel', no:"No, I'll handle it", send:'Sent the note', pick:'Picked', confirm:'Order it', back:'Back to options', snooze:'Got it', decline:'No thanks'};
-// scenario is driven by the trip; ?mode=seasoned|smooth still works for demos
-let mode = new URLSearchParams(location.search).get('mode') || 'new';
+
+// ---- traveler login: pick one of the five, run their scenario ----
+let mode = null, PMETA = {};
+function setBar(id){
+  const p = PMETA[id];
+  $('#avatar').textContent = p ? p.initial : 'A';
+  $('#whoName').textContent = p ? p.name : 'Arrival agent';
+  $('#whoSub').textContent = p ? `${p.tag} · watching SFO arrival tonight` : 'watching SFO arrival · tonight';
+}
+function showLogin(){
+  if (es) es.close();
+  $('#switch').hidden = true;
+  $('#login').hidden = false;
+  $('#foot').style.display = 'none';
+  $('#ctx').hidden = true;
+  thread.innerHTML = '';
+  $('#avatar').textContent = 'A'; $('#whoName').textContent = 'Arrival agent'; $('#whoSub').textContent = 'choose a traveler';
+}
+function buildLogin(list){
+  const box = $('#login');
+  box.innerHTML = `<h2>Choose a traveler</h2>
+    <p class="sub">Each runs their own scenario — their Uber Eats taste, trip delay, and what the agent has learned about them.</p>`;
+  list.forEach(p => {
+    const b = document.createElement('button'); b.className = 'pcard';
+    b.innerHTML = `<span class="pav">${esc(p.initial)}</span>
+      <span class="pbody"><div class="pnm">${esc(p.name)}</div><div class="ptg">${esc(p.tag)}</div></span>
+      <span class="parr">→</span>`;
+    b.onclick = () => enter(p.id);
+    box.appendChild(b);
+  });
+}
+function enter(id){
+  mode = id;
+  PMETA[id] || (PMETA[id] = null);
+  setBar(id);
+  $('#login').hidden = true;
+  $('#foot').style.display = 'flex';
+  $('#switch').hidden = false;
+  start();
+}
+$('#switch').onclick = showLogin;
+
 function start(){
   thread.innerHTML = '';
   fetch(`/api/concierge/run?mode=${mode}`, {method:'POST'}).then(r=>r.json()).then(r=>{
@@ -220,7 +279,13 @@ async function say(){
 $('#sayBtn').onclick = say;
 $('#say').addEventListener('keydown', e => { if (e.key === 'Enter') say(); });
 
-start();
+// boot: load the roster, then show login (or deep-link straight into ?mode=)
+const urlMode = new URLSearchParams(location.search).get('mode');
+fetch('/api/concierge/personas').then(r=>r.json()).then(list => {
+  list.forEach(p => PMETA[p.id] = p);
+  buildLogin(list);
+  if (urlMode) { enter(urlMode); } else { showLogin(); }
+}).catch(() => { mode = urlMode || 'new'; $('#foot').style.display='flex'; start(); });
 </script>
 </body>
 </html>

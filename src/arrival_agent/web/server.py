@@ -125,6 +125,12 @@ class SayRequest(BaseModel):
     text: str
 
 
+@app.get("/api/concierge/personas")
+def concierge_personas():
+    """The traveler roster for the login screen."""
+    return concierge.personas()
+
+
 @app.post("/api/concierge/run")
 def concierge_run(mode: str = "new"):
     run = concierge.registry.create(mode=mode)
