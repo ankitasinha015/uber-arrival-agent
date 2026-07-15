@@ -131,12 +131,9 @@ ARRIVAL_AGENT_CACHE=record python -m arrival_agent.cli --scenario delayed-flight
 ARRIVAL_AGENT_CACHE=replay python -m arrival_agent.cli --scenario delayed-flight   # replay (no network)
 ```
 
-Deploy (Fly.io, scales to zero so it costs nothing idle):
-
-```bash
-fly launch --copy-config --no-deploy   # may ask for a unique app name
-fly deploy
-```
+**Deploy your own.** The live demo runs on Hugging Face Spaces (free, always-on, makes
+real Foursquare/Mapbox calls). Full runbook: [`docs/DEPLOY_HF.md`](docs/DEPLOY_HF.md).
+A `fly.toml` is also included if you prefer Fly.io (`fly deploy`).
 
 ---
 

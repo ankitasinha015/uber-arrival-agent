@@ -105,3 +105,20 @@ directly — `?mode=priya`, `?mode=marcus`, `?mode=olivia`, `?mode=dev`, `?mode=
 The through-line: **one engine, proportionate response.** Same agent, five very
 different traveler needs — different cities, tastes, and trip states — met by acting
 more or less rather than always the same.
+
+## Trip-sync: one signature booking each
+
+A trip isn't just a flight. When a flight slips or the airline rebooks, the agent
+notifies the hotel on its own and then re-syncs every arrival-coupled booking to the
+new landing time. Each traveler carries a **distinct** one, so the demo shows the sync
+working across different booking types rather than the same script five times:
+
+| Traveler | Signature booking | What the agent does |
+|---|---|---|
+| Priya | Meet & Greet — airport pickup | Re-times the greeter. Because a greeter drives her to the hotel, the agent **does not** offer an Uber on top — it reasons over her existing bookings instead of contradicting them. |
+| Marcus | Hertz rental car | Holds the car for the later arrival. He drives himself, so again no Uber. |
+| Dev | Uber Reserve pickup | Rebooks the pickup for the new landing time and hands off to live tracking on arrival. |
+| Lena | Dinner reservation | Releases the 9pm table (she'll land too late) and switches to Uber Eats delivery to the room. |
+
+Travelers with no arrival transport (Olivia) get the ride offer; the rest defer to what
+they already have. The agent has the trip data, so it acts on it.
