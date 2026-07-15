@@ -76,6 +76,13 @@ re-syncs every arrival-coupled booking (pickup, rental, dinner reservation) to t
 arrival, and hands off ride tracking. The agent reasons over the traveler's existing
 bookings (e.g. a meet-&-greet pickup means no Uber is offered).
 
+**R5a — Reservation vs delivery (OpenTable ↔ room service).** Uber Travel Mode books
+restaurant reservations and delivers room service, but doesn't choose between them. The
+agent does, from the arrival timing: if the traveler will be out of the airport in time to
+make the table, it keeps the reservation (they dine out); if they'll land too late, it
+releases the table and switches to Travel Mode room-service delivery. Same wait-rule math,
+a new decision. (`_reservation_decision`, spec'd in [`TECH_SPEC_RETIMING.md`](TECH_SPEC_RETIMING.md).)
+
 **R6 — Proportionate response.** An intensity dial (HIGH/LOW/NONE) scales the action list
 to the traveler and the moment; behavior memory drops what a returning traveler always
 dismisses.

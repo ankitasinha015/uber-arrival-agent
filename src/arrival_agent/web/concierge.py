@@ -108,6 +108,7 @@ def _design(candidates, context):
 AIRPORT_EXIT_MIN = 35        # domestic: deplane + baggage claim
 INTL_EXIT_MIN = 80           # international: + passport control/immigration + customs
 RIDE_TO_HOTEL_MIN = 15       # airport → hotel, rough
+RESTAURANT_TRAVEL_MIN = 20   # airport → a restaurant, for the reservation-vs-delivery call
 
 # Non-US arrival airports — an arrival here (from a US origin) is international, so
 # the traveler clears immigration + customs, which runs long. (Would be a real
@@ -375,11 +376,9 @@ _SEED_TRAVELERS = {
                "city": "Berlin", "hotel": "Hotel Zoo, Berlin", "currency": "€",
                "hotel_address": "Hotel Zoo Berlin, Kurfürstendamm 25, 10719 Berlin, Germany",
                "flight": "LH 435", "route": "JFK → BER",
-               "bookings": [
-                   {"name": "Dinner reservation — Lokal, Mitte", "icon": "🍽️", "primary": True,
-                    "did": "released the 9:00 PM table — you'll land too late; I'll sort delivery to your room instead",
-                    "confirm": "RES-2291", "at": "table released · switching to Uber Eats delivery"},
-               ],
+               # a real OpenTable-style reservation with a TIME; the agent decides at
+               # arrival whether she'll make it (keep the table) or not (release + deliver).
+               "reservation": {"place": "Lokal, Mitte", "time": "21:00"},
                "signals": {"delay_min": 20, "arrival_hour": 23, "security_wait_min": 35, "pre_flight_min": 120, "security_fresh": True}},
 }
 
@@ -415,11 +414,63 @@ def _loc(mode: str) -> dict:
     return {k: p[k] for k in ("city", "hotel", "hotel_address", "flight", "route", "currency")}
 
 
+# --- reservation vs delivery: the OpenTable decision (Uber GO-GET Travel Mode) ----
+# Uber Travel Mode books restaurant reservations (OpenTable) AND delivers room service.
+# It doesn't decide between them. This is that decision, and it reuses the arrival-timing
+# math: if the traveler will be out of the airport in time to make the table, keep it and
+# they dine out; if they'll land too late, release the table and switch to room service.
+
+def _makes_reservation(arrival_dt: datetime, exit_min: int, resv_time: str,
+                       travel_min: int = RESTAURANT_TRAVEL_MIN):
+    """Pure: will the traveler make an OpenTable-style reservation? They're mobile out of
+    the airport at arrival + exit_min, plus travel_min to the restaurant. Returns
+    (makes_it, mobile_dt). Testable without a persona."""
+    resv_dt = datetime.strptime(resv_time, "%H:%M")
+    mobile_dt = arrival_dt + timedelta(minutes=exit_min + travel_min)
+    return mobile_dt <= resv_dt, mobile_dt
+
+
+def _reservation_decision(mode: str):
+    """The reservation-vs-delivery call for a traveler, or None if they have no booking."""
+    resv = _PERSONAS.get(mode, {}).get("reservation")
+    if not resv:
+        return None
+    intl = _is_international(_loc(mode).get("route", ""))
+    exit_min = INTL_EXIT_MIN if intl else AIRPORT_EXIT_MIN
+    makes, mobile_dt = _makes_reservation(_arrival_dt(mode), exit_min, resv["time"])
+    fmt = lambda dt: dt.strftime("%I:%M %p").lstrip("0")
+    return {"place": resv["place"], "time_str": datetime.strptime(resv["time"], "%H:%M"),
+            "resv_str": fmt(datetime.strptime(resv["time"], "%H:%M")),
+            "make": makes, "mobile_str": fmt(mobile_dt)}
+
+
+def _reservation_booking(mode: str):
+    """The reservation rendered as a synced-booking card, with the decision baked in."""
+    d = _reservation_decision(mode)
+    if not d:
+        return None
+    if d["make"]:
+        return {"name": f"Dinner reservation — {d['place']}", "icon": "🍽️", "primary": True,
+                "did": (f"kept your {d['resv_str']} table — you'll be out of the airport by "
+                        f"~{d['mobile_str']}, in time to make it"),
+                "confirm": "RES-2291", "at": f"table confirmed · dining out at {d['place']}"}
+    return {"name": f"Dinner reservation — {d['place']}", "icon": "🍽️", "primary": True,
+            "did": (f"released your {d['resv_str']} table — you'll only clear the airport by "
+                    f"~{d['mobile_str']}, too late to make it; switched to Uber Travel Mode "
+                    f"room service to your room"),
+            "confirm": "RES-2291", "at": "table released · switching to room-service delivery"}
+
+
 def _trip_extras(mode: str):
     """Other arrival-coupled bookings the agent syncs on a disruption (Uber ride,
-    porter, rental car…), plus one it flags rather than moves on its own."""
+    porter, rental car…), plus one it flags rather than moves on its own. A restaurant
+    reservation is resolved into a keep-or-release booking via the arrival-timing call."""
     p = _PERSONAS.get(mode, {})
-    return p.get("bookings", []), p.get("flag")
+    bookings = list(p.get("bookings", []))
+    resv = _reservation_booking(mode)
+    if resv:
+        bookings = [resv] + bookings
+    return bookings, p.get("flag")
 
 
 def _uber_ride(mode: str):

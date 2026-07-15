@@ -40,6 +40,12 @@ Picking one restaurant out of fifty is search. Deciding *not* to order yet is ju
 40-minute gap is the entire argument for building an agent instead of a notification, and it's
 the one thing I want someone to remember.
 
+The same timing math does a second job. Uber Travel Mode books restaurant reservations
+(OpenTable) *and* delivers room service, but it doesn't choose between them. This agent does:
+if you'll clear the airport in time to make your table, it keeps the reservation; if you'll
+land too late, it releases the table and switches to room-service delivery. One rule ("when
+will you actually be there"), two decisions.
+
 ## How I kept it honest
 
 An agent that recommends dinner can lie in small, plausible ways, and those lies are the ones
