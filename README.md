@@ -11,11 +11,23 @@ short_description: Travel Mode × Eats trip concierge — a live agent demo
 
 # Uber Arrival Agent
 
-An agent at the seam between **Travel Mode** and **Eats**. You're flying somewhere
-and you'll land late. It watches your trip, predicts when you'll reach your hotel
-room, finds food that's actually open, and at the right moment hands you two or
-three meaningfully different options. You take the final call by picking one — the
-agent does everything else.
+### An agent that knows when *not* to act.
+
+Most trip apps send a notification. This one decides when to stay quiet. You're flying
+somewhere and you'll land late. It watches the trip, predicts when you'll actually be in
+your hotel room, and hands you a dinner already timed to arrive after you do.
+
+**The hard part is restraint.** A naive version orders the moment your flight lands and
+delivers dinner at **00:32**, 40 minutes before you reach the room. This agent waits until
+**01:12**, because ordering early leaves food at the front desk while you're still in the
+cab. Picking one restaurant out of fifty is search. Deciding *not* to order yet is judgment.
+
+> **Positioning:** Uber's GO-GET 2026 shipped the rails (Travel Mode, room-service delivery,
+> Eats for the Way, a voice assistant). The missing layer is a proactive, stateful agent that
+> orchestrates them across a trip when something goes wrong. This is that layer.
+
+**[▶ Try it live](https://ankita015-uber-arrival-agent.hf.space/concierge)** ·
+**[Read the 2-minute case study](docs/CASE_STUDY.md)**
 
 ## Trip Concierge
 
