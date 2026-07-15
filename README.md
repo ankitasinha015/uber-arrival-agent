@@ -27,7 +27,7 @@ cab. Picking one restaurant out of fifty is search. Deciding *not* to order yet 
 > orchestrates them across a trip when something goes wrong. This is that layer.
 
 **[▶ Try it live](https://ankita015-uber-arrival-agent.hf.space/concierge)** ·
-**[Read the 2-minute case study](docs/CASE_STUDY.md)**
+**[Case study](docs/CASE_STUDY.md)** · **[PRD](docs/PRD.md)** · **[Architecture](ARCHITECTURE.md)**
 
 ## Trip Concierge
 

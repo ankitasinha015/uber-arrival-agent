@@ -185,6 +185,8 @@ deterministic and the personas come from the in-code seed, so the image stays li
 ## Where to read more
 
 - [`DESIGN.md`](DESIGN.md) — the design decisions and the as-built delta.
+- [`docs/PRD.md`](docs/PRD.md) — product requirements, goals, non-goals.
+- [`docs/TECH_SPEC_RETIMING.md`](docs/TECH_SPEC_RETIMING.md) — the wait-vs-act rule in detail.
 - [`docs/CASE_STUDY.md`](docs/CASE_STUDY.md) — the product story in one page.
 - [`docs/DATA_STORE.md`](docs/DATA_STORE.md) — the ChromaDB store in detail.
 - [`docs/PERSONAS.md`](docs/PERSONAS.md) — the five travelers and the trip-sync arc.
