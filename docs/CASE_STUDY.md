@@ -2,10 +2,10 @@
 
 **One line:** Most trip apps send a notification. This one decides when to stay quiet.
 
-A working, deployed agent that sits at the seam between Uber's Travel Mode and Eats. You're
-flying somewhere and you'll land late. It watches the trip, predicts when you'll actually be
-in your hotel room, and at the right moment hands you a dinner already timed to arrive after
-you do. Live demo: `https://ankita015-uber-arrival-agent.hf.space/concierge`
+A working, deployed agent that sits on top of Uber Travel Mode's room-service delivery. You're
+arriving somewhere new. It watches the trip, predicts when you'll actually be in your hotel
+room, and times the room-service order so dinner lands after you do, not before. Live demo:
+`https://ankita015-uber-arrival-agent.hf.space/concierge`
 
 ---
 
@@ -82,6 +82,8 @@ Rejected decisions show judgment more than shipped features do.
 
 ## Positioning
 
-Uber's GO-GET 2026 shipped the rails: Travel Mode, room-service delivery, Eats for the Way, a
-voice assistant. The missing layer is a proactive, stateful agent that orchestrates those rails
-across a trip when something goes wrong. This is a working prototype of that layer.
+Uber GO-GET 2026's Travel Mode shipped "room service" delivered to your hotel door (food and
+forgotten essentials). Uber built the delivery rail; its own description says nothing about
+*when*. This agent is the missing intelligence: the arrival-orchestration layer that predicts
+when you'll be in your room and fires the Travel Mode room-service order so food lands after
+you do. A working prototype of the judgment the rail doesn't have.

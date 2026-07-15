@@ -112,9 +112,11 @@ dead option, backfill a replacement), not a special case.
 
 ## Positioning
 
-Uber's GO-GET 2026 shipped the rails (Travel Mode, room-service delivery, Eats for the
-Way, a voice assistant). The missing layer is a proactive, stateful agent that orchestrates
-them across a trip when something goes wrong. This is a working prototype of that layer.
+Uber GO-GET 2026's Travel Mode added "room service" delivered to your hotel door (food and
+forgotten essentials), announced April 2026. Uber built the delivery rail; its own description
+says nothing about *when* to order. This product is the missing intelligence: the arrival-
+orchestration layer that predicts room arrival and times the Travel Mode room-service order so
+food lands after the traveler does, not before.
 
 ## Appendix
 

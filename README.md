@@ -13,18 +13,20 @@ short_description: Travel Mode × Eats trip concierge — a live agent demo
 
 ### An agent that knows when *not* to act.
 
-Most trip apps send a notification. This one decides when to stay quiet. You're flying
-somewhere and you'll land late. It watches the trip, predicts when you'll actually be in
-your hotel room, and hands you a dinner already timed to arrive after you do.
+Most trip apps send a notification. This one decides when to stay quiet. You're arriving
+somewhere new, and Uber Travel Mode can now deliver room service to your door. This agent
+watches the trip, predicts when you'll actually be in your room, and times that delivery to
+land after you do, not before.
 
 **The hard part is restraint.** A naive version orders the moment your flight lands and
 delivers dinner at **00:32**, 40 minutes before you reach the room. This agent waits until
 **01:12**, because ordering early leaves food at the front desk while you're still in the
 cab. Picking one restaurant out of fifty is search. Deciding *not* to order yet is judgment.
 
-> **Positioning:** Uber's GO-GET 2026 shipped the rails (Travel Mode, room-service delivery,
-> Eats for the Way, a voice assistant). The missing layer is a proactive, stateful agent that
-> orchestrates them across a trip when something goes wrong. This is that layer.
+> **Positioning:** Uber GO-GET 2026's Travel Mode added room service to your hotel door (food
+> and forgotten essentials). It delivers; it doesn't decide *when*. This agent is the
+> arrival-orchestration layer on top of that rail: it predicts when you'll actually be in your
+> room and times the Travel Mode room-service order so food lands after you do, not before.
 
 **[▶ Try it live](https://ankita015-uber-arrival-agent.hf.space/concierge)** ·
 **[Case study](docs/CASE_STUDY.md)** · **[PRD](docs/PRD.md)** · **[Architecture](ARCHITECTURE.md)**
