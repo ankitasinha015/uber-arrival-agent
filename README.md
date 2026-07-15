@@ -139,6 +139,9 @@ A `fly.toml` is also included if you prefer Fly.io (`fly deploy`).
 
 ## How it works
 
+The short version is below; the full architecture with diagrams (layers, the runtime
+loop, the dinner data flow, the SSE sequence) is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
 A framework-agnostic **core** (the agent's reasoning + tools) with thin **adapters**
 that wrap it in an orchestration framework — so the same agent can run on, and be
 compared across, different frameworks.

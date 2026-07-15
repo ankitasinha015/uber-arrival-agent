@@ -53,3 +53,6 @@ concierge_checkpoints.sqlite
 
 evals/review/traces.js
 evals/review/labels.*
+
+# generated artifact (regenerate: make-pdf/dist/pdf generate docs/CASE_STUDY.md docs/CASE_STUDY.pdf)
+docs/*.pdf
